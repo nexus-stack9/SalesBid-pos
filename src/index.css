@@ -1,0 +1,68 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 240 3.7% 96.1%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 240 3.7% 96.1%;
+    --accent-foreground: 217.2 32.6% 17.5%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 240 3.7% 90.1%;
+    --input: 240 3.7% 90.1%;
+    --ring: 224.3 76.3% 48%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 223 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 27.9% 16.9%;
+    --sidebar-ring: 224.3 76.3% 48%;
+  }
+
+  * {
+    @apply border-border selection:bg-primary/10;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  .card-hover {
+    @apply transition-all hover:shadow-md hover:shadow-primary/10 hover:-translate-y-1 duration-300;
+  }
+
+  .card-stats {
+    @apply rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:shadow-primary/10;
+  }
+
+  .glass-card {
+    @apply bg-card/30 backdrop-blur-sm border-primary/20 shadow-inner shadow-primary/5;
+  }
+}
