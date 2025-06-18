@@ -75,7 +75,7 @@ const SideNav = ({ onLogout }: SideNavProps) => {
         {!collapsed && (
           <span className="text-xl font-semibold text-sidebar-foreground flex gap-2 items-center">
             <span className="h-6 w-6 rounded bg-primary"></span>
-            Admin<span className="text-primary">Pulse</span>
+            Sales Bid
           </span>
         )}
         <Button 

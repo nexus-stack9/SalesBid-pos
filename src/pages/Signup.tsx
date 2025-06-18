@@ -35,7 +35,7 @@ const Signup = () => {
       {/* Left side - Image and welcome text */}
       <div className="hidden md:flex md:w-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white flex-col justify-center p-12">
         <div className="max-w-md mx-auto">
-          <h1 className="text-4xl font-bold mb-6">Join AdminPulse!</h1>
+          <h1 className="text-4xl font-bold mb-6">Join Sales Bid!</h1>
           <p className="text-xl mb-8">Create an account to start managing your business operations efficiently.</p>
           <div className="space-y-6">
             <div className="flex items-center">
