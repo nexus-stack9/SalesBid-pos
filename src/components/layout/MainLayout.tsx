@@ -4,6 +4,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import SideNav from './SideNav';
 import Header from './Header';
 import { toast } from 'sonner';
+import Cookies from 'js-cookie';
 
 const MainLayout = () => {
   const navigate = useNavigate();
@@ -20,9 +21,17 @@ const MainLayout = () => {
   }, []);
 
   const handleLogout = () => {
+    // Remove auth token cookie
+    Cookies.remove('authToken', { path: '/' });
+    
+    // Clear local storage
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('user');
+    
+    // Show success message
     toast.success('Logged out successfully');
+    
+    // Redirect to login page
     navigate('/login');
   };
 

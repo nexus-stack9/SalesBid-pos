@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { getVendorIdFromToken } from '@/utils/auth';
+import { getRecordById } from '@/services/crudService';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -36,7 +38,12 @@ const profileFormSchema = z.object({
   email: z.string().email({
     message: 'Please enter a valid email address.',
   }),
-  bio: z.string().optional(),
+  phone: z.string()
+    .min(10, 'Phone number must be at least 10 digits')
+    .regex(/^[0-9]+$/, 'Phone number must contain only numbers'),
+  address: z.string().min(5, {
+    message: 'Please enter a valid address.',
+  }),
 });
 
 const notificationsFormSchema = z.object({
@@ -61,28 +68,69 @@ const securityFormSchema = z.object({
   path: ["confirmPassword"],
 });
 
+interface VendorData {
+  'Vendor ID'?: number;
+  'Vendor Name'?: string;
+  'Vendor Email'?: string;
+  'Vendor Phone'?: string;
+  'Vendor Address'?: string;
+  [key: string]: string | number | undefined;
+}
+
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
-
+  const [vendorData, setVendorData] = useState<VendorData>({});
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      name: 'Admin User',
-      email: 'admin@example.com',
-      bio: 'Administrator with full system access.',
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
     },
   });
 
-  const notificationsForm = useForm<z.infer<typeof notificationsFormSchema>>({
-    resolver: zodResolver(notificationsFormSchema),
-    defaultValues: {
-      emailNotifications: true,
-      pushNotifications: true,
-      productUpdates: true,
-      securityAlerts: true,
-    },
-  });
+  const fetchVendorData = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const vendorId = getVendorIdFromToken();
+      if (!vendorId) {
+        throw new Error('Vendor ID not found in token');
+      }
+      
+      const response = await getRecordById('vendorForm', vendorId);
+      if (response.success && response.data) {
+        const vendor = response.data;
+        setVendorData(vendor);
+        profileForm.reset({
+          name: vendor['Vendor Name'] || '',
+          email: vendor['Vendor Email'] || '',
+          phone: (vendor['Vendor Phone'] || '').replace(/\D/g, ''),
+          address: vendor['Vendor Address'] || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching vendor data:', error);
+      toast.error('Failed to load vendor data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profileForm]);
+
+  useEffect(() => {
+    fetchVendorData();
+  }, [fetchVendorData]);
+
+  // const notificationsForm = useForm<z.infer<typeof notificationsFormSchema>>({
+  //   resolver: zodResolver(notificationsFormSchema),
+  //   defaultValues: {
+  //     emailNotifications: true,
+  //     pushNotifications: true,
+  //     productUpdates: true,
+  //     securityAlerts: true,
+  //   },
+  // });
 
   const securityForm = useForm<z.infer<typeof securityFormSchema>>({
     resolver: zodResolver(securityFormSchema),
@@ -93,15 +141,27 @@ const Settings = () => {
     },
   });
 
-  const onProfileSubmit = (data: z.infer<typeof profileFormSchema>) => {
-    setIsLoading(true);
-    
-    // Simulate API request
-    setTimeout(() => {
-      console.log('Profile data:', data);
+  const onProfileSubmit = async (data: z.infer<typeof profileFormSchema>) => {
+    try {
+      setIsLoading(true);
+      const vendorId = getVendorIdFromToken();
+      if (!vendorId) {
+        throw new Error('Vendor ID not found in token');
+      }
+      
+      // TODO: Call update API here
+      console.log('Updating vendor data:', { vendorId, data });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const onNotificationsSubmit = (data: z.infer<typeof notificationsFormSchema>) => {
@@ -133,12 +193,12 @@ const Settings = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
+      {/* <h2 className="text-3xl font-bold tracking-tight">Settings</h2> */}
       
       <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 max-w-md mb-6">
+        <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
         
@@ -152,62 +212,91 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex flex-col items-center gap-4 w-full md:w-1/4">
+                {/* <div className="flex flex-col items-center gap-4 w-full md:w-1/4">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src="/placeholder.svg" alt="Admin User" />
                     <AvatarFallback className="text-xl bg-primary/10 text-primary">AD</AvatarFallback>
                   </Avatar>
                   <Button variant="outline" size="sm">Change Avatar</Button>
-                </div>
+                </div> */}
                 
-                <div className="w-full md:w-3/4">
+                <div className="w-full">
                   <Form {...profileForm}>
-                    <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
-                      <FormField
-                        control={profileForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="bio"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Bio</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                          control={profileForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={profileForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input {...field} />
+                                </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={profileForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="tel"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  placeholder="Enter 10 digit number"
+                                  {...field}
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '');
+                                    field.onChange(value);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={profileForm.control}
+                          name="address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Address</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Enter your address"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       
                       <Button 
                         type="submit" 
-                        className="mt-4"
+                        className="mt-2"
                         disabled={isLoading}
                       >
                         {isLoading ? (
@@ -227,7 +316,7 @@ const Settings = () => {
           </Card>
         </TabsContent>
         
-        <TabsContent value="notifications">
+        {/* <TabsContent value="notifications">
           <Card>
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
@@ -345,7 +434,7 @@ const Settings = () => {
               </Form>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
         
         <TabsContent value="security">
           <Card>

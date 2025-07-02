@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { isAdmin } from '@/utils/auth';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -52,15 +53,21 @@ const NavItem = ({ icon: Icon, label, path, collapsed }: NavItemProps) => {
 
 const SideNav = ({ onLogout }: SideNavProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+
+  useEffect(() => {
+    // Check if user is admin when component mounts
+    setIsUserAdmin(isAdmin());
+  }, []);
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-    { icon: Users, label: "Vendors", path: "/vendors" },
+    ...(isUserAdmin ? [{ icon: Users, label: "Vendors", path: "/vendors" }] : []),
     { icon: ShoppingBag, label: "Products", path: "/products" },
     { icon: ShoppingCart, label: "Orders", path: "/orders" },
-    { icon: Store, label: "Stores", path: "/stores" },
-    { icon: UserCircle, label: "Customers", path: "/customers" },
-    { icon: Ticket, label: "Coupons", path: "/coupons" },
+    // { icon: Store, label: "Stores", path: "/stores" },
+    // { icon: UserCircle, label: "Customers", path: "/customers" },
+    // { icon: Ticket, label: "Coupons", path: "/coupons" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
 

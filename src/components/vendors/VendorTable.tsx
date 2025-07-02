@@ -22,7 +22,7 @@ const VendorTable = ({ vendors, onDelete }: VendorTableProps) => {
     {
       id: 'email',
       header: 'Email',
-      cell: (row: Vendor) => <div className="text-muted-foreground">{row.email}</div>,
+      cell: (row: Vendor) => <div className="text-foreground">{row.email}</div>,
       filterType: 'text' as const
     },
     {
@@ -37,6 +37,8 @@ const VendorTable = ({ vendors, onDelete }: VendorTableProps) => {
       cell: (row: Vendor) => row.category,
       filterType: 'select' as const,
       filterOptions: [
+        { label: 'Furniture', value: 'Furniture' },
+        { label: 'Marketing Services', value: 'Marketing Services' },
         { label: 'Office Supplies', value: 'Office Supplies' },
         { label: 'Electronics', value: 'Electronics' },
         { label: 'Shipping', value: 'Shipping' },
@@ -58,24 +60,25 @@ const VendorTable = ({ vendors, onDelete }: VendorTableProps) => {
         { label: 'Inactive', value: 'inactive' },
       ]
     },
-    {
-      id: 'joinDate',
-      header: 'Join Date',
-      cell: (row: Vendor) => new Date(row.joinDate).toLocaleDateString(),
-      filterType: 'text' as const
-    },
+
     {
       id: 'actions',
       header: 'Actions',
       cell: (row: Vendor) => (
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" asChild>
-            <Link to={`/vendors/${row.id}`}>
+            <Link to={`/vendors/${row.id}`} onClick={(e) => {
+              console.log('Edit clicked for vendor ID:', row.id);
+              e.stopPropagation();
+            }}>
               <Edit className="h-4 w-4" />
               <span className="sr-only">Edit</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onDelete(row.id)}>
+          <Button variant="ghost" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            onDelete(row.id);
+          }}>
             <Trash2 className="h-4 w-4" />
             <span className="sr-only">Delete</span>
           </Button>

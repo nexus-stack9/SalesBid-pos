@@ -276,7 +276,7 @@ export const DataTable = <T extends { id: string | number }>({
               {columns
                 .filter((column) => visibleColumns.includes(column.id))
                 .map((column) => (
-                  <TableHead key={column.id}>{column.header}</TableHead>
+                  <TableHead key={column.id} className="font-bold text-black">{column.header}</TableHead>
                 ))}
             </TableRow>
           </TableHeader>

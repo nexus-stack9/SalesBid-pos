@@ -6,5 +6,5 @@ export interface Vendor {
   contact: string;
   category: string;
   status: "active" | "inactive";
-  joinDate: string;
+  address: string;
 }

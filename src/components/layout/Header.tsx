@@ -1,10 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Search, User, LogOut, Settings, X, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getUserDataFromToken } from '@/utils/auth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +43,7 @@ const pathToPageName: Record<string, string> = {
   '/settings': 'Settings',
   '/orders': 'Orders',
   '/notifications': 'Notifications',
-  '/profile': 'Profile',
+  // '/profile': 'Profile',
 };
 
 // Sample notifications data - in a real app this would come from an API or state management
@@ -85,11 +86,31 @@ const Header = ({ onLogout }: HeaderProps) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   const currentPageName = pathToPageName[location.pathname] || 'Dashboard';
-  const userDataStr = localStorage.getItem('user') || '{}';
-  const userData = JSON.parse(userDataStr);
-  const email = userData.email || 'admin@example.com';
-  const name = userData.name || 'Admin User';
-  const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase();
+  const [userData, setUserData] = useState<{
+    name?: string;
+    email?: string;
+  }>({});
+
+  // Get user data from JWT token
+  useEffect(() => {
+    const user = getUserDataFromToken();
+    if (user) {
+      setUserData({
+        name: user.name || user.email?.split('@')[0] || 'User',
+        email: user.email || ''
+      });
+    }
+  }, []);
+
+  // Get initials from name (first letters of each word, up to 2 characters)
+  const initials = userData.name
+    ? userData.name
+        .split(' ')
+        .filter((_: string, index: number) => index < 2) // Take first two words max
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+    : 'U';
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -226,24 +247,32 @@ const Header = ({ onLogout }: HeaderProps) => {
                 variant="ghost" 
                 className="relative h-8 w-8 rounded-full"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder.svg" alt={name} />
-                  <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
+                <Avatar className="h-9 w-9 bg-primary/10 hover:bg-primary/20 transition-colors">
+                  <AvatarFallback className="text-primary font-medium text-base">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{email}</p>
+              <DropdownMenuLabel className="font-normal p-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                    <span className="text-2xl font-medium text-primary">
+                      {initials}
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium leading-none">{userData.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{userData.email}</p>
+                  </div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleNavigate('/profile')}>
+              {/* <DropdownMenuItem onClick={() => handleNavigate('/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuItem onClick={() => handleNavigate('/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>

@@ -48,9 +48,14 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/vendors" element={<Vendors />} />
-              <Route path="/vendors/create" element={<VendorCreate />} />
-              <Route path="/vendors/:id" element={<VendorEdit />} />
+              
+              {/* Vendor routes - Admin only */}
+              <Route element={<ProtectedRoute adminOnly />}>
+                <Route path="/vendors" element={<Vendors />} />
+                <Route path="/vendors/create" element={<VendorCreate />} />
+                <Route path="/vendors/:id" element={<VendorEdit />} />
+              </Route>
+              
               <Route path="/products" element={<Products />} />
               <Route path="/products/create" element={<ProductCreate />} />
               <Route path="/products/:id" element={<ProductEdit />} />

@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import DataTable from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { fetchProducts, type Product } from '@/services/crudService';
+import { getAllProducts, Product } from '@/services/crudService';
 import { format } from 'date-fns';
 import LiveStreamModal from '@/components/shared/LiveStreamModal';
 
@@ -24,7 +24,7 @@ const Products = () => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const { data } = await fetchProducts();
+        const { data } = await getAllProducts('productForm');
         setProducts(data);
       } catch (err) {
         console.error('Error loading products:', err);

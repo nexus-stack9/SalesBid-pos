@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { LogIn, Mail, Lock } from 'lucide-react';
+import { loginUser } from '@/services/auth';
+import Cookies from 'js-cookie';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,19 +16,41 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted');
+    console.log('Email:', email, 'Password:', password ? '***' : 'empty');
+    
+    if (!email || !password) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+    
     setIsLoading(true);
 
-    // Simulate authentication
-    setTimeout(() => {
-      // For demo purposes, allow any login
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('user', JSON.stringify({ email }));
-      toast.success('Login successful!');
-      navigate('/');
+    try {
+      console.log('Calling loginUser with:', { email, password: '***' });
+      const response = await loginUser({ email, password });
+      console.log('Login response:', response);
+      
+      if (response && response.token && response.user) {
+        Cookies.set('authToken', response.token, { expires: 7 });
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('user', JSON.stringify({ 
+          email,
+          name: response.user.name || email.split('@')[0],
+        }));
+        toast.success('Sign in successful!');
+        navigate('/');
+      } else {
+        throw new Error('No token received in response');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error instanceof Error ? error.message : 'Invalid email or password');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

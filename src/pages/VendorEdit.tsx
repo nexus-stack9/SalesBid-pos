@@ -15,55 +15,9 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Vendor } from '@/types/vendor';
+import { getRecordById, updateRecord } from '@/services/crudService';
 
-// Mock data - in a real application, this would be fetched from an API
-const mockVendors: Vendor[] = [
-  {
-    id: 1,
-    name: "Acme Supplies",
-    email: "info@acmesupplies.com",
-    contact: "+1 (555) 123-4567",
-    category: "Office Supplies",
-    status: "active",
-    joinDate: "2021-03-12"
-  },
-  {
-    id: 2,
-    name: "Tech Innovations",
-    email: "contact@techinnovations.com",
-    contact: "+1 (555) 987-6543",
-    category: "Electronics",
-    status: "active",
-    joinDate: "2022-01-05"
-  },
-  {
-    id: 3,
-    name: "Global Logistics",
-    email: "support@globallogistics.com",
-    contact: "+1 (555) 456-7890",
-    category: "Shipping",
-    status: "inactive",
-    joinDate: "2020-11-18"
-  },
-  {
-    id: 4,
-    name: "Green Solutions",
-    email: "info@greensolutions.com",
-    contact: "+1 (555) 234-5678",
-    category: "Eco-friendly Products",
-    status: "active",
-    joinDate: "2022-06-23"
-  },
-  {
-    id: 5,
-    name: "Premium Foods",
-    email: "orders@premiumfoods.com",
-    contact: "+1 (555) 789-0123",
-    category: "Food & Beverage",
-    status: "active",
-    joinDate: "2021-09-30"
-  }
-];
+
 
 const categories = [
   "Office Supplies",
@@ -77,55 +31,109 @@ const categories = [
 ];
 
 const VendorEdit = () => {
-  const { id } = useParams();
+  const { id: urlId } = useParams<{ id: string }>();
+  console.log('URL Params ID:', urlId);
   const navigate = useNavigate();
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [formData, setFormData] = useState<Partial<Vendor>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
+  
+  // Ensure we have a valid ID
+  const vendorId = urlId ? parseInt(urlId, 10) : null;
 
   useEffect(() => {
-    // Simulating API fetch - in a real app, this would be an API call
-    const fetchVendor = () => {
+    const fetchVendor = async () => {
+      if (!vendorId || isNaN(vendorId)) {
+        console.error('Invalid vendor ID:', urlId);
+        toast.error("Invalid vendor ID");
+        navigate('/vendors');
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const foundVendor = mockVendors.find(v => v.id === Number(id));
-        if (foundVendor) {
-          setVendor(foundVendor);
-          setFormData({ ...foundVendor });
+        console.log('Fetching vendor with ID:', vendorId);
+        const response = await getRecordById('vendorForm', vendorId);
+        console.log('API Response:', response);
+        
+        if (response.success && response.data) {
+          const vendorData = response.data;
+          console.log('Vendor Data:', vendorData);
+          
+          // Map the API response fields to the form fields
+          const mappedVendor: Vendor = {
+            id: vendorData['Vendor ID'] || vendorId,
+            name: vendorData['Vendor Name'] || '',
+            email: vendorData['Vendor Email'] || '',
+            contact: vendorData['Vendor Phone'] || '',
+            address: vendorData['Vendor Address'] || '',
+            category: vendorData['Category'] || '',
+            status: vendorData['Status'] === 1 ? 'active' : 'inactive' as const
+          };
+          
+          console.log('Mapped Vendor:', mappedVendor);
+          
+          setVendor(mappedVendor);
+          setFormData(mappedVendor);
         } else {
-          toast.error("Vendor not found");
-          navigate('/vendors');
+          throw new Error(response.message || 'Failed to load vendor data');
         }
       } catch (error) {
-        toast.error("Failed to load vendor");
-        console.error(error);
+        console.error('Error fetching vendor:', error);
+        toast.error('Failed to load vendor data');
+        navigate('/vendors');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchVendor();
-  }, [id, navigate]);
+  }, [vendorId, urlId, navigate]);
 
   const handleChange = (field: keyof Vendor, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setIsDirty(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!vendorId) {
+      console.error('No valid vendor ID found');
+      toast.error("Vendor ID is missing");
+      return;
+    }
+
+    console.log('Submitting form with vendor ID:', vendorId);
     setIsLoading(true);
 
-    // Simulating API update - in a real app, this would be an API call
     try {
-      // In a real app, you'd make an API request to update the vendor
-      toast.success("Vendor updated successfully");
-      setIsDirty(false);
-      navigate('/vendors');
+      const payload = {
+        id: vendorId,
+        name: formData.name || '',
+        email: formData.email || '',
+        contact: formData.contact || '',
+        address: formData.address || '',
+        status: formData.status === 'active' ? 1 : 0,
+        category: formData.category || ''
+      };
+      
+      console.log('Final payload before update:', payload);
+
+      console.log('Sending update payload:', payload);
+      const response = await updateRecord('vendorForm', payload);
+
+      if (response.success) {
+        toast.success("Vendor updated successfully");
+        setIsDirty(false);
+        navigate('/vendors');
+      } else {
+        throw new Error(response.message || 'Failed to update vendor');
+      }
     } catch (error) {
-      toast.error("Failed to update vendor");
-      console.error(error);
+      console.error('Error updating vendor:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update vendor');
     } finally {
       setIsLoading(false);
     }
@@ -223,16 +231,6 @@ const VendorEdit = () => {
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="joinDate">Join Date</Label>
-                <Input
-                  id="joinDate"
-                  type="date"
-                  value={formData.joinDate || ''}
-                  onChange={(e) => handleChange('joinDate', e.target.value)}
-                />
               </div>
             </div>
           </CardContent>

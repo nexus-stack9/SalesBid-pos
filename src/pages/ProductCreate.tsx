@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useState, useRef, KeyboardEvent } from 'react';
+import { insertRecord } from '@/services/crudService';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,16 +21,23 @@ interface Product {
   id?: number;
   product_name: string;
   product_description: string;
-  starting_price: number;
+  starting_price: string | number;
   category: string;
+  category_id?: number;
   auction_start: string;
   auction_end: string;
   product_status: "draft" | "active" | "sold" | "expired";
-  retail_value: number;
+  retail_value: string;
   location: string;
   shipping: string;
   quantity: number;
   images: File[];
+  seller_id?: number;
+  vendor_id?: number;
+  trending: boolean;
+  tags: string[];
+  created_by?: string;
+  image_path?: string;
 }
 
 const categories = [
@@ -48,20 +56,25 @@ const ProductCreate = () => {
   const [formData, setFormData] = useState<Partial<Product>>({
     product_name: '',
     product_description: '',
-    starting_price: 0,
+    starting_price: '',
     category: '',
     auction_start: new Date().toISOString().slice(0, 16),
     auction_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
     product_status: 'draft',
-    retail_value: 0,
+    retail_value: '',
     location: '',
     shipping: '',
     quantity: 1,
-    images: []
+    images: [],
+    trending: false,
+    tags: []
   });
+  
+  const [tagInput, setTagInput] = useState('');
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleChange = (field: keyof Product, value: string | number | File[]) => {
+  const handleChange = (field: keyof Product, value: string | number | boolean | File[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -82,16 +95,67 @@ const ProductCreate = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const addTag = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim();
+      if (!formData.tags?.includes(newTag)) {
+        setFormData(prev => ({
+          ...prev,
+          tags: [...(prev.tags || []), newTag]
+        }));
+      }
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      toast.success("Product created successfully");
-      navigate('/products');
+    try {
+      // Prepare data for submission
+      const submissionData = {
+        ...formData,
+        starting_price: Number(formData.starting_price) || 0,
+        // Ensure all required fields are included
+        product_name: formData.product_name || '',
+        product_description: formData.product_description || '',
+        category: formData.category || '',
+        auction_start: formData.auction_start || new Date().toISOString(),
+        auction_end: formData.auction_end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        product_status: formData.product_status || 'draft',
+        quantity: Number(formData.quantity) || 1,
+        trending: formData.trending || false,
+        tags: formData.tags || [],
+      };
+
+      // Remove undefined values
+      const cleanData = Object.fromEntries(
+        Object.entries(submissionData).filter(([_, v]) => v !== undefined && v !== '')
+      );
+
+      const result = await insertRecord('productForm', cleanData);
+
+      if (result.success) {
+        toast.success("Product created successfully!");
+        navigate('/products');
+      } else {
+        toast.error(result.error || 'Failed to create product');
+      }
+    } catch (error) {
+      console.error('Error creating product:', error);
+      toast.error('An error occurred while creating the product');
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -128,8 +192,9 @@ const ProductCreate = () => {
                 <Input
                   id="starting_price"
                   type="number"
-                  value={formData.starting_price || 0}
-                  onChange={(e) => handleChange('starting_price', Number(e.target.value))}
+                  value={formData.starting_price}
+                  onChange={(e) => handleChange('starting_price', e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   placeholder="0.00"
                   min="0"
                   step="0.01"
@@ -190,6 +255,26 @@ const ProductCreate = () => {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="retail_value">Retail Value</Label>
+                <Input
+                  id="retail_value"
+                  value={formData.retail_value || ''}
+                  onChange={(e) => handleChange('retail_value', e.target.value)}
+                  placeholder="Enter retail value"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={formData.location || ''}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                  placeholder="Enter location"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="shipping">Shipping</Label>
                 <Input
                   id="shipping"
@@ -197,6 +282,55 @@ const ProductCreate = () => {
                   onChange={(e) => handleChange('shipping', e.target.value)}
                   placeholder="Enter shipping details"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="trending">Trending</Label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="trending"
+                    checked={formData.trending || false}
+                    onChange={(e) => handleChange('trending', e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <Label htmlFor="trending" className="text-sm font-medium text-gray-700">
+                    Mark as trending
+                  </Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tags">Tags</Label>
+                <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[40px]">
+                  {formData.tags?.map((tag) => (
+                    <span 
+                      key={tag}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-200 text-blue-800 hover:bg-blue-300 focus:outline-none"
+                      >
+                        <span className="sr-only">Remove tag</span>
+                        <svg className="w-2 h-2" fill="currentColor" viewBox="0 0 8 8">
+                          <path fillRule="evenodd" d="M4 3.293l2.146-2.147a.5.5 0 01.708.708L4.707 4l2.147 2.146a.5.5 0 01-.708.708L4 4.707l-2.146 2.147a.5.5 0 01-.708-.708L3.293 4 1.146 1.854a.5.5 0 01.708-.708L4 3.293z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    ref={tagInputRef}
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={addTag}
+                    placeholder="Type and press Enter to add tags"
+                    className="flex-1 min-w-[200px] border-0 focus:ring-0 focus:outline-none text-sm"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -233,30 +367,7 @@ const ProductCreate = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="retail_value">Retail Value ($)</Label>
-                <Input
-                  id="retail_value"
-                  type="number"
-                  value={formData.retail_value || 0}
-                  onChange={(e) => handleChange('retail_value', Number(e.target.value))}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={formData.location || ''}
-                  onChange={(e) => handleChange('location', e.target.value)}
-                  placeholder="Enter location"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
+             <div className="space-y-2 md:col-span-2">
                 <Label>Images</Label>
                 <div className="border-2 border-dashed rounded-lg p-4">
                   <Input
