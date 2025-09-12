@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Cookies from 'js-cookie';
 
+
 // Get the API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -21,6 +22,7 @@ export interface Product {
   'Shipping': string;
   'Quantity': number;
   'Image Path': string | null;
+  'Video Path'?: string | null;
 }
 
 interface ApiResponse {
@@ -150,7 +152,7 @@ export const insertRecord = async <T>(
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/global/insert`, {
+    const response = await fetch(`${API_BASE_URL}/product/addProduct`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -293,7 +295,7 @@ export const updateRecord = async <T>(
     };
 
     console.log('Making update API call with payload:', payload);
-    const response = await fetch(`${API_BASE_URL}/global/update`, {
+    const response = await fetch(`${API_BASE_URL}/product/products`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(payload),
@@ -315,6 +317,32 @@ export const updateRecord = async <T>(
     };
   }
 };
+
+
+
+
+
+export const updatedata = async (formName, id, data) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          formName,
+          id,
+          ...data,
+        }),
+      });
+
+      const result = await response.json();
+      return result; // { success, message, data }
+    } catch (error) {
+      console.error("API updateRecord error:", error);
+      return { success: false, message: error.message };
+    }
+  };
 
 /**
  * Deletes a record by ID
@@ -339,7 +367,7 @@ export const deleteRecord = async (
       console.warn('No auth token found for delete operation');
     }
 
-    const url = new URL(`${API_BASE_URL}/global/delete`);
+    const url = new URL(`${API_BASE_URL}/product/products`);
     url.searchParams.append('formName', formName);
     url.searchParams.append('id', id.toString());
     
@@ -365,3 +393,105 @@ export const deleteRecord = async (
     };
   }
 };
+
+
+
+
+interface UploadFileResponse {
+  success: boolean;
+  message?: string;
+  file?: {
+    url: string;
+    key: string;
+    fileName: string;
+  };
+  files?: any[]; // for multi-upload
+}
+
+/**
+ * Upload a single file to the server
+ * @param file The file to upload
+ * @param path The path/folder to store the file in
+ */
+export const uploadFile = async (
+  file: File,
+  path: string
+): Promise<UploadFileResponse> => {
+  try {
+    const token = Cookies.get('authToken');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', path); // backend will expect "path"
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/upload/single`, {
+      method: 'POST',
+      headers, // don't set Content-Type → fetch will set multipart boundary automatically
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`File upload failed: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in uploadFile:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to upload file',
+    };
+  }
+};
+
+/**
+ * Upload multiple files to different paths
+ * @param files Array of files
+ * @param paths Array of paths (must match files length)
+ */
+export const uploadMultipleFiles = async (
+  files: File[],
+  path: string
+): Promise<UploadFileResponse> => {
+  try {
+    const token = Cookies.get('authToken');
+    const formData = new FormData();
+console.log(files)
+    files.forEach((file) => {
+      console.log(file)
+      formData.append('files', file); // backend expects req.files
+    });
+
+    // Send single path string
+    formData.append('path', path);
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    console.log(formData)
+
+    const response = await fetch(`${API_BASE_URL}/file/multiple-upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Multi file upload failed: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in uploadMultipleFiles:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to upload files',
+    };
+  }
+};
+

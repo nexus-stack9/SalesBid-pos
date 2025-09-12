@@ -1,6 +1,6 @@
 
 import { useState, useRef, KeyboardEvent } from 'react';
-import { insertRecord } from '@/services/crudService';
+import { insertRecord, uploadMultipleFiles, uploadFile, updateRecord } from '@/services/crudService';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,12 +32,14 @@ interface Product {
   shipping: string;
   quantity: number;
   images: File[];
+  video: File[]; // single video file
   seller_id?: number;
   vendor_id?: number;
   trending: boolean;
   tags: string[];
   created_by?: string;
   image_path?: string;
+  video_path?: string;
 }
 
 const categories = [
@@ -66,6 +68,7 @@ const ProductCreate = () => {
     shipping: '',
     quantity: 1,
     images: [],
+    video: [],
     trending: false,
     tags: []
   });
@@ -86,6 +89,11 @@ const ProductCreate = () => {
         images: [...(prev.images || []), ...files]
       }));
     }
+  };
+
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    setFormData(prev => ({ ...prev, video: files }));
   };
 
   const removeImage = (index: number) => {
@@ -116,47 +124,86 @@ const ProductCreate = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      // Prepare data for submission
-      const submissionData = {
-        ...formData,
-        starting_price: Number(formData.starting_price) || 0,
-        // Ensure all required fields are included
-        product_name: formData.product_name || '',
-        product_description: formData.product_description || '',
-        category: formData.category || '',
-        auction_start: formData.auction_start || new Date().toISOString(),
-        auction_end: formData.auction_end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        product_status: formData.product_status || 'draft',
-        quantity: Number(formData.quantity) || 1,
-        trending: formData.trending || false,
-        tags: formData.tags || [],
-      };
+  try {
+    // Step 1: Prepare product data (without images)
+    const submissionData = {
+      ...formData,
+      starting_price: Number(formData.starting_price) || 0,
+      product_name: formData.product_name || '',
+      product_description: formData.product_description || '',
+      category: formData.category || '',
+      auction_start: formData.auction_start || new Date().toISOString(),
+      auction_end:
+        formData.auction_end ||
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      product_status: formData.product_status || 'draft',
+      quantity: Number(formData.quantity) || 1,
+      trending: formData.trending || false,
+      tags: formData.tags || [],
+      images: undefined, // ⚠️ don't send files here
+    };
 
-      // Remove undefined values
-      const cleanData = Object.fromEntries(
-        Object.entries(submissionData).filter(([_, v]) => v !== undefined && v !== '')
-      );
+    const cleanData = Object.fromEntries(
+      Object.entries(submissionData).filter(
+        ([_, v]) => v !== undefined && v !== ''
+      )
+    );
 
-      const result = await insertRecord('productForm', cleanData);
+    // Step 2: Create product (no images yet)
+    const result = await insertRecord('productForm', cleanData);
 
-      if (result.success) {
-        toast.success("Product created successfully!");
-        navigate('/products');
-      } else {
-        toast.error(result.error || 'Failed to create product');
-      }
-    } catch (error) {
-      console.error('Error creating product:', error);
-      toast.error('An error occurred while creating the product');
-    } finally {
-      setIsLoading(false);
+    if (!result.success || !result.id) {
+      toast.error(result.error || 'Failed to create product');
+      return;
     }
-  };
+          const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
+
+    const productId = result.id; // backend should return new ID
+    const vendorId = formData.vendor_id || 1; // TODO: set from auth/user context
+    const uploadPath = `${filePathPrefix}/${vendorId}/Products/${productId}`;
+
+    // Step 3: Upload images if any
+    let imagesPath: string[] = [];
+        let videoPath: string[] = [];
+    if (formData.images && formData.images.length > 0) {
+      imagesPath = formData.images.map((file) => `${uploadPath}/${file.name}`);
+      const uploadRes = await uploadMultipleFiles(formData.images, uploadPath);
+      videoPath =  formData.video.map((file) => `${uploadPath}/${file.name}`);
+      const uploadRes1 = await uploadMultipleFiles(formData.video, uploadPath);
+      if (!uploadRes.success) {
+        toast.error('Product created but image upload failed!');
+      }
+    }
+
+    // Step 4: Upload video if provided
+    // if (formData.video) {
+    //   videoPath = `${uploadPath}/video-${Date.now()}-${formData.video.name}`;
+    //   const uploadVideoRes = await uploadFile(formData.video, uploadPath);
+    //   if (!uploadVideoRes.success) {
+    //     toast.error('Product created but video upload failed!');
+    //   }
+    // }
+
+    // Step 5: Update product with media paths
+    toast.success('Product created successfully!');
+    await updateRecord('productForm', {
+      id: productId,
+      image_path: imagesPath.join(','),
+      video_path: videoPath.join(',')
+    });
+    navigate('/products');
+  } catch (error) {
+    console.error('Error creating product:', error);
+    toast.error('An error occurred while creating the product');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="container mx-auto py-10">
@@ -397,6 +444,26 @@ const ProductCreate = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>Product Video</Label>
+                <div className="border-2 border-dashed rounded-lg p-4">
+                  <Input
+                    type="file"
+                    multiple
+                    accept="video/*"
+                    onChange={handleVideoChange}
+                    className="mb-2"
+                  />
+                  {/* {formData.video && (
+                    <video
+                      src={URL.createObjectURL(formData.video[0])}
+                      controls
+                      className="w-full max-h-64 rounded-md"
+                    />
+                  )} */}
                 </div>
               </div>
             </div>

@@ -1,14 +1,16 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Download, Video } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Video, PlayCircle, StopCircle, Images, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { getAllProducts, Product } from '@/services/crudService';
+import { getAllProducts, Product, updateRecord, deleteRecord } from '@/services/crudService';
 import { format } from 'date-fns';
 import LiveStreamModal from '@/components/shared/LiveStreamModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -19,6 +21,16 @@ const Products = () => {
   // State for live stream modal
   const [liveStreamModalOpen, setLiveStreamModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Auction schedule modal state
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [auctionStart, setAuctionStart] = useState<string>('');
+  const [auctionEnd, setAuctionEnd] = useState<string>('');
+
+  // Media preview modal
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaImages, setMediaImages] = useState<string[]>([]);
+  const [mediaVideo, setMediaVideo] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -41,6 +53,62 @@ const Products = () => {
   const handleLiveStream = (product: Product) => {
     setSelectedProduct(product);
     setLiveStreamModalOpen(true);
+  };
+
+  const openSchedule = (product: Product) => {
+    setSelectedProduct(product);
+    setAuctionStart(new Date(product['Auction Start']).toISOString().slice(0, 16));
+    setAuctionEnd(new Date(product['Auction End']).toISOString().slice(0, 16));
+    setScheduleOpen(true);
+  };
+
+  const saveSchedule = async () => {
+    if (!selectedProduct) return;
+    try {
+      const payload = {
+        id: selectedProduct['Product ID'],
+        auction_start: new Date(auctionStart).toISOString(),
+        auction_end: new Date(auctionEnd).toISOString(),
+        status: 'active', // mark as live
+      };
+      const res = await updateRecord('productForm', payload);
+      if (!res.success) throw new Error(res.message || 'Failed to update auction');
+      toast.success('Auction schedule updated');
+      // refresh list
+      const { data } = await getAllProducts('productForm');
+      setProducts(data);
+      setScheduleOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Failed to save auction');
+    }
+  };
+
+  const stopAuction = async (product: Product) => {
+    try {
+      const res = await updateRecord('productForm', {
+        id: product['Product ID'],
+        status: 'draft',
+      });
+      if (!res.success) throw new Error(res.message || 'Failed to stop auction');
+      toast.success('Auction stopped');
+      const { data } = await getAllProducts('productForm');
+      setProducts(data);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Failed to stop auction');
+    }
+  };
+
+  const viewMedia = (product: Product) => {
+    const images = (product['Image Path'] || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const video = (product['Video Path'] || '') || null;
+    setMediaImages(images);
+    setMediaVideo(video);
+    setMediaOpen(true);
   };
 
   const columns = [
@@ -88,8 +156,24 @@ const Products = () => {
       ),
       filterType: 'select' as const,
       filterOptions: [
+        { label: 'Draft', value: 'draft' },
         { label: 'Active', value: 'active' },
-        { label: 'Inactive', value: 'inactive' },
+        { label: 'Sold', value: 'sold' },
+        { label: 'Expired', value: 'expired' },
+      ]
+    },
+    {
+      id: 'Auction Live',
+      header: 'Live?',
+      cell: (row: Product) => (
+        <Badge variant={row['Product Status'] === 'active' ? 'success' as any : 'secondary'}>
+          {row['Product Status'] === 'active' ? 'Yes' : 'No'}
+        </Badge>
+      ),
+      filterType: 'select' as const,
+      filterOptions: [
+        { label: 'Yes', value: 'yes' },
+        { label: 'No', value: 'no' },
       ]
     },
     {
@@ -130,7 +214,7 @@ const Products = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => handleDelete(row['Product ID'])}
+            onClick={() => confirmDelete(row['Product ID'])}
             aria-label="Delete product"
           >
             <Trash2 className="h-4 w-4 text-destructive" />
@@ -138,10 +222,37 @@ const Products = () => {
           <Button
             variant="ghost"
             size="icon"
+            onClick={() => openSchedule(row)}
+            aria-label="Schedule auction"
+            title="Schedule auction"
+          >
+            <PlayCircle className="h-4 w-4 text-green-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => stopAuction(row)}
+            aria-label="Stop auction"
+            title="Stop auction"
+          >
+            <StopCircle className="h-4 w-4 text-red-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => viewMedia(row)}
+            aria-label="View media"
+            title="View images and video"
+          >
+            <Images className="h-4 w-4 text-blue-500" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => handleLiveStream(row)}
             aria-label="Live stream product"
           >
-            <Video className="h-4 w-4 text-blue-500" />
+            <Video className="h-4 w-4 text-purple-500" />
           </Button>
         </div>
       ),
