@@ -30,6 +30,7 @@ import CouponCreate from "./pages/CouponCreate";
 import Vendors from "./pages/Vendors";
 import VendorEdit from "./pages/VendorEdit";
 import VendorCreate from "./pages/VendorCreate";
+import VendorApprovals from "./pages/VendorApprovals";
 
 const queryClient = new QueryClient();
 
@@ -51,14 +52,15 @@ const App = () => (
               
               {/* Vendor routes - Admin only */}
               <Route element={<ProtectedRoute adminOnly />}>
-                <Route path="/vendors" element={<Vendors />} />
+                {/* <Route path="/vendors" element={<Vendors />} /> */}
                 <Route path="/vendors/create" element={<VendorCreate />} />
                 <Route path="/vendors/:id" element={<VendorEdit />} />
+                <Route path="/vendors" element={<VendorApprovals />} />
               </Route>
               
               <Route path="/products" element={<Products />} />
               <Route path="/products/create" element={<ProductCreate />} />
-              <Route path="/products/:id" element={<ProductEdit />} />
+              <Route path="products/edit/:id" element={<ProductEdit />} />
               <Route path="/stores" element={<Stores />} />
               <Route path="/stores/create" element={<StoreCreate />} />
               <Route path="/stores/:id" element={<StoreEdit />} />
