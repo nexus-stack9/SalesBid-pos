@@ -28,6 +28,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 const encryptPassword = (password: string) => {
   const secretKey = import.meta.env.VITE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('Missing VITE_SECRET_KEY for password encryption');
+  }
   return CryptoJS.AES.encrypt(password, secretKey).toString();
 };
 
@@ -78,6 +81,16 @@ export const loginUser = async (userData: LoginUserData) => {
     if (!response.ok) {
       const errorMessage = data.error || 'Login failed';
       throw new Error(errorMessage);
+    }
+
+    // Persist tokens/cookies for route protection
+    const accessToken = data.accessToken || data.token || data.authToken;
+    if (accessToken) {
+      Cookies.set('authToken', accessToken, { expires: 7 });
+      localStorage.setItem('isAuthenticated', 'true');
+    }
+    if (data.refreshToken) {
+      Cookies.set('refreshToken', data.refreshToken, { expires: 14 });
     }
 
     return data;
@@ -136,14 +149,14 @@ export const resetPassword = async (data: ResetPasswordData) => {
   }
 };
 
-export const loginWithGoogle = async (token) => {
+export const loginWithGoogle = async (token: string) => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login/google`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json", // Ensure the Content-Type header is set
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ token }), // Send the Google token in the request body
+      body: JSON.stringify({ token }),
     });
 
     if (!response.ok) {
@@ -152,15 +165,18 @@ export const loginWithGoogle = async (token) => {
     }
 
     const data = await response.json();
-    
-    // Set tokens in cookies if they exist in the response
-    if (data.accessToken) {
-      Cookies.set('accessToken', data.accessToken, { expires: 7 });
+
+    // Persist tokens/cookies consistently for route protection
+    const accessToken = data.accessToken || data.token || data.authToken;
+    if (accessToken) {
+      Cookies.set('authToken', accessToken, { expires: 7 });
+      Cookies.set('accessToken', accessToken, { expires: 7 }); // keep for compatibility
+      localStorage.setItem('isAuthenticated', 'true');
     }
     if (data.refreshToken) {
       Cookies.set('refreshToken', data.refreshToken, { expires: 14 });
     }
-    
+
     return data;
 
   } catch (error) {

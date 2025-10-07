@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "baseUrl": "./src",
+     "target": "ES2020",
+    "module": "ES2020",   // or "ESNext", "Node16", etc.
+    "moduleResolution": "Node",
+    "lib": ["ES2020", "DOM"],
+    "types": ["vite/client"]   // <-- Important for Vite env types
+  }
+  
+}
