@@ -4,7 +4,7 @@ import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
-const ProductUploadModal = ({ isOpen, onClose, onSave }) => {
+const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEditMode = false }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -70,6 +70,63 @@ const ProductUploadModal = ({ isOpen, onClose, onSave }) => {
     { value: 'express', label: 'Express Shipping' },
     { value: 'pickup', label: 'Local Pickup Only' }
   ];
+
+  // Initialize form data when in edit mode
+  useEffect(() => {
+    if (initialData && isEditMode && isOpen) {
+      setFormData({
+        name: initialData.name || '',
+        description: initialData.description || '',
+        category_id: initialData.category_id || '',
+        vendor_id: initialData.vendor_id || '',
+        starting_price: initialData.starting_price || '',
+        retail_value: initialData.retail_value || '',
+        auction_start: initialData.auction_start || '',
+        auction_end: initialData.auction_end || '',
+        location: initialData.location || '',
+        shipping: initialData.shipping || '',
+        quantity: initialData.quantity || '',
+        condition: initialData.condition || '',
+        tags: initialData.tags || '',
+        buy_option: initialData.buy_option || 0,
+        sale_price: initialData.sale_price || '',
+        weight: initialData.weight || '',
+        height: initialData.height || '',
+        length: initialData.length || '',
+        breadth: initialData.breadth || '',
+        trending: initialData.trending || false,
+        isactive: initialData.isactive !== undefined ? initialData.isactive : true
+      });
+    } else if (!isOpen) {
+      // Reset form when modal closes
+      setFormData({
+        name: '',
+        description: '',
+        category_id: '',
+        vendor_id: '',
+        starting_price: '',
+        retail_value: '',
+        auction_start: '',
+        auction_end: '',
+        location: '',
+        shipping: '',
+        quantity: '',
+        condition: '',
+        tags: '',
+        buy_option: 0,
+        sale_price: '',
+        weight: '',
+        height: '',
+        length: '',
+        breadth: '',
+        trending: false,
+        isactive: true
+      });
+      setImages([]);
+      setVideos([]);
+      setErrors({});
+    }
+  }, [initialData, isEditMode, isOpen]);
 
   // Warn about unsaved changes
   useEffect(() => {
@@ -461,7 +518,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave }) => {
         {/* Header */}
         <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border z-10">
           <h2 id="modal-title" className="text-xl font-semibold text-foreground">
-            Add New Product
+            {isEditMode ? 'Edit Product' : 'Add New Product'}
           </h2>
           <Button
             variant="ghost"
@@ -1048,7 +1105,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave }) => {
             disabled={isSaving}
             className={isSaving ? 'animate-pulse' : ''}
           >
-            {isSaving ? 'Saving...' : 'Save Product'}
+            {isSaving ? 'Saving...' : (isEditMode ? 'Update Product' : 'Save Product')}
           </Button>
         </div>
       </div>

@@ -9,13 +9,16 @@ import ProductUploadModal from './components/ProductUploadModal';
 import Button from '../../components/ui/Button';
 import { getAllVendors } from '../../services/posCrud';
 import { getAllProductsByVendorId } from '../../services/posCrud';
-import { insertRecord, uploadMultipleFiles, uploadFile, updatedata } from '../../services/crudService';
+import { insertRecord, uploadMultipleFiles, uploadFile, updatedata, deleteRecord } from '../../services/crudService';
 
 const ProductCatalogManagement = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
@@ -95,41 +98,82 @@ const ProductCatalogManagement = () => {
     setCurrentPage(1);
   };
 
-  const handleStatusToggle = (productId) => {
-    setProducts(prev => prev?.map(product =>
-      product?.product_id === productId
-        ? { ...product, isActive: !product?.isActive }
-        : product
-    ));
-    setFilteredProducts(prev => prev?.map(product =>
-      product?.product_id === productId
-        ? { ...product, isActive: !product?.isActive }
-        : product
-    ));
+  const handleStatusToggle = async (productId) => {
+    try {
+      const product = products.find(p => p.product_id === productId);
+      if (!product) return;
+
+      const newStatus = !product.isactive;
+      
+      // Update in database
+      const result = await updatedata('productForm', productId, {
+        is_active: newStatus
+      });
+
+      if (!result.success) {
+        console.error('Failed to update product status:', result.message);
+        return;
+      }
+
+      // Update local state
+      setProducts(prev => prev?.map(p =>
+        p?.product_id === productId
+          ? { ...p, isactive: newStatus }
+          : p
+      ));
+      setFilteredProducts(prev => prev?.map(p =>
+        p?.product_id === productId
+          ? { ...p, isactive: newStatus }
+          : p
+      ));
+
+      console.log('Product status updated successfully');
+    } catch (error) {
+      console.error('Error toggling product status:', error);
+    }
   };
 
-  const handleAuctionToggle = (productId) => {
-    setProducts(prev => prev?.map(product =>
-      product?.product_id === productId
-        ? { 
-            ...product, 
-            auctionStatus: product?.auctionStatus === 'live' ? 'scheduled' : 'live'
-          }
-        : product
-    ));
-    setFilteredProducts(prev => prev?.map(product =>
-      product?.product_id === productId
-        ? { 
-            ...product, 
-            auctionStatus: product?.auctionStatus === 'live' ? 'scheduled' : 'live'
-          }
-        : product
-    ));
+  const handleAuctionToggle = async (productId) => {
+    try {
+      const product = products.find(p => p.product_id === productId);
+      if (!product) return;
+
+      const newStatus = product?.auctionstatus === 'live' ? 'scheduled' : 'live';
+      
+      // Update in database
+      const result = await updatedata('productForm', productId, {
+        auction_status: newStatus
+      });
+
+      if (!result.success) {
+        console.error('Failed to update auction status:', result.message);
+        return;
+      }
+
+      // Update local state
+      setProducts(prev => prev?.map(p =>
+        p?.product_id === productId
+          ? { ...p, auctionstatus: newStatus }
+          : p
+      ));
+      setFilteredProducts(prev => prev?.map(p =>
+        p?.product_id === productId
+          ? { ...p, auctionstatus: newStatus }
+          : p
+      ));
+
+      console.log('Auction status updated successfully');
+    } catch (error) {
+      console.error('Error toggling auction status:', error);
+    }
   };
 
   const handleEditProduct = (productId) => {
-    console.log('Edit product:', productId);
-    // Navigate to edit page or open edit modal
+    const product = products.find(p => p.product_id === productId);
+    if (product) {
+      setEditingProduct(product);
+      setIsEditModalOpen(true);
+    }
   };
 
   const handleSelectProduct = (productId, isSelected) => {
@@ -152,65 +196,177 @@ const ProductCatalogManagement = () => {
     }
   };
 
-  const handleBulkAction = (action) => {
+  const handleCellValueUpdate = async (productId, field, value) => {
+    try {
+      // Prepare update data based on field - map to UI field names
+      const updateData = {};
+      if (field === 'startDate' || field === 'auction_start') {
+        updateData.auction_start = value;
+      } else if (field === 'endDate' || field === 'auction_end') {
+        updateData.auction_end = value;
+      } else {
+        // Map common fields to UI field names
+        const fieldMapping = {
+          'name': 'product_name',
+          'description': 'product_description',
+          'status': 'product_status',
+          'isactive': 'is_active',
+          'auctionstatus': 'auction_status'
+        };
+        const uiFieldName = fieldMapping[field] || field;
+        updateData[uiFieldName] = value;
+      }
+
+      // Update in database
+      const result = await updatedata('productForm', productId, updateData);
+
+      if (!result.success) {
+        console.error('Failed to update product field:', result.message);
+        return;
+      }
+
+      // Update local state
+      setProducts(prev => prev?.map(product =>
+        product?.product_id === productId
+          ? { ...product, ...updateData }
+          : product
+      ));
+      setFilteredProducts(prev => prev?.map(product =>
+        product?.product_id === productId
+          ? { ...product, ...updateData }
+          : product
+      ));
+
+      console.log('Product field updated successfully');
+    } catch (error) {
+      console.error('Error updating product field:', error);
+    }
+  };
+
+  const handleBulkAction = async (action) => {
     console.log(`Performing bulk action: ${action} on products:`, selectedProducts);
     
-    switch (action) {
-      case 'activate':
-        setProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, isActive: true }
-            : product
-        ));
-        setFilteredProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, isActive: true }
-            : product
-        ));
-        break;
-      case 'deactivate':
-        setProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, isActive: false }
-            : product
-        ));
-        setFilteredProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, isActive: false }
-            : product
-        ));
-        break;
-      case 'start-auction':
-        setProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, auctionStatus: 'live' }
-            : product
-        ));
-        setFilteredProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, auctionStatus: 'live' }
-            : product
-        ));
-        break;
-      case 'end-auction':
-        setProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, auctionStatus: 'ended' }
-            : product
-        ));
-        setFilteredProducts(prev => prev?.map(product =>
-          selectedProducts?.includes(product?.product_id)
-            ? { ...product, auctionStatus: 'ended' }
-            : product
-        ));
-        break;
-      case 'delete':
-        setProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
-        setFilteredProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
-        break;
+    if (selectedProducts.length === 0) {
+      return;
     }
-    
-    setSelectedProducts([]);
+
+    try {
+      setIsLoading(true);
+      
+      switch (action) {
+        case 'activate':
+          // Update all selected products to active
+          await Promise.all(
+            selectedProducts.map(productId =>
+              updatedata('productForm', productId, { is_active: true })
+            )
+          );
+          setProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, isactive: true }
+              : product
+          ));
+          setFilteredProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, isactive: true }
+              : product
+          ));
+          break;
+          
+        case 'deactivate':
+          // Update all selected products to inactive
+          await Promise.all(
+            selectedProducts.map(productId =>
+              updatedata('productForm', productId, { is_active: false })
+            )
+          );
+          setProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, isactive: false }
+              : product
+          ));
+          setFilteredProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, isactive: false }
+              : product
+          ));
+          break;
+          
+        case 'start-auction':
+          // Start auction for all selected products
+          await Promise.all(
+            selectedProducts.map(productId =>
+              updatedata('productForm', productId, { auction_status: 'live' })
+            )
+          );
+          setProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, auctionstatus: 'live' }
+              : product
+          ));
+          setFilteredProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, auctionstatus: 'live' }
+              : product
+          ));
+          break;
+          
+        case 'end-auction':
+          // End auction for all selected products
+          await Promise.all(
+            selectedProducts.map(productId =>
+              updatedata('productForm', productId, { auction_status: 'ended' })
+            )
+          );
+          setProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, auctionstatus: 'ended' }
+              : product
+          ));
+          setFilteredProducts(prev => prev?.map(product =>
+            selectedProducts?.includes(product?.product_id)
+              ? { ...product, auctionstatus: 'ended' }
+              : product
+          ));
+          break;
+          
+        case 'delete':
+          const confirmDelete = window.confirm(
+            `Are you sure you want to delete ${selectedProducts.length} product(s)? This action cannot be undone.`
+          );
+          
+          if (!confirmDelete) {
+            setIsLoading(false);
+            return;
+          }
+          
+          // Delete all selected products
+          const deleteResults = await Promise.all(
+            selectedProducts.map(productId =>
+              deleteRecord('productForm', productId)
+            )
+          );
+          
+          const failedDeletes = deleteResults.filter(r => !r.success);
+          if (failedDeletes.length > 0) {
+            console.error('Some deletes failed:', failedDeletes);
+          }
+          
+          setProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
+          setFilteredProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
+          
+          const successCount = selectedProducts.length - failedDeletes.length;
+          if (successCount > 0) {
+          }
+          break;
+      }
+      
+      setSelectedProducts([]);
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleClearSelection = () => {
@@ -226,11 +382,86 @@ const ProductCatalogManagement = () => {
     setIsUploadModalOpen(true);
   };
 
+  const handleEditSave = async (productData) => {
+    try {
+      console.log('Updating product with data:', productData);
+
+      // Prepare update data using UI field names
+      const updateData = {
+        product_name: productData.name,
+        product_description: productData.description,
+        category_id: productData.category_id,
+        vendor_id: productData.vendor_id,
+        starting_price: productData.starting_price,
+        retail_value: productData.retail_value,
+        auction_start: productData.auction_start,
+        auction_end: productData.auction_end,
+        location: productData.location,
+        shipping: productData.shipping,
+        quantity: productData.quantity,
+        condition: productData.condition,
+        tags: productData.tags,
+        buy_option: productData.buy_option,
+        sale_price: productData.sale_price,
+        weight: productData.weight,
+        height: productData.height,
+        length: productData.length,
+        breadth: productData.breadth,
+        trending: productData.trending,
+        is_active: productData.isactive,
+        product_status: productData.status,
+        auction_status: productData.auctionstatus
+      };
+
+      // Update in database
+      const result = await updatedata('productForm', editingProduct.product_id, updateData);
+      if (!result.success) {
+        console.error('Failed to update product:', result.message);
+        return;
+      }
+
+      // Handle image uploads if any
+      if (productData.imageFiles && productData.imageFiles.length > 0) {
+        const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
+        const vendorId = productData.vendor_id || editingProduct?.vendor_id || 15;
+        const uploadPath = `${vendorId}/Products/${editingProduct?.product_id}`;
+        
+        try {
+          const uploadRes = await uploadMultipleFiles(productData.imageFiles, uploadPath);
+          
+          if (uploadRes.success) {
+            const mainImagePath = `${filePathPrefix}/${uploadPath}/${productData.imageFiles[0].name}`;
+            updateData.image_path = mainImagePath;
+            
+            // Update with image path
+            await updatedata('productForm', editingProduct.product_id, { image_path: mainImagePath });
+          }
+        } catch (uploadError) {
+          console.error('Error during image upload:', uploadError);
+        }
+      }
+
+      // Update local state
+      setProducts(prev => prev?.map(product =>
+        product?.product_id === editingProduct?.product_id
+          ? { ...product, ...updateData }
+          : product
+      ));
+      setFilteredProducts(prev => prev?.map(product =>
+        product?.product_id === editingProduct?.product_id
+          ? { ...product, ...updateData }
+          : product
+      ));
+
+      console.log('Product updated successfully');
+    } catch (error) {
+      console.error('Error updating product:', error);
+    }
+  };
+
   const handleSaveProduct = async (productData) => {
     try {
       console.log('Saving product with data:', productData);
-      
-      // Prepare product data for database (without file objects)
       const productFormData = {
         name: productData.name,
         description: productData.description,
@@ -266,7 +497,6 @@ const ProductCatalogManagement = () => {
       
       if (!result.success || !result.id) {
         console.error('Failed to create product:', result.error);
-        alert(result.error || 'Failed to create product');
         return;
       }
       
@@ -306,13 +536,11 @@ const ProductCatalogManagement = () => {
             }
           } else {
             console.error('Image upload failed:', uploadRes.error);
-            alert('Product created but image upload failed. You can add images later.');
           }
         } catch (uploadError) {
           console.error('Error during image upload:', uploadError);
-          alert('Product created but image upload failed. You can add images later.');
         }
-      }
+      } 
       
       // Step 3: Handle video uploads if any
       if (productData.videoFiles && productData.videoFiles.length > 0) {
@@ -329,7 +557,6 @@ const ProductCatalogManagement = () => {
             console.log('Videos uploaded successfully');
           } else {
             console.error('Video upload failed:', uploadRes.error);
-            alert('Videos upload failed. You can add videos later.');
           }
         } catch (uploadError) {
           console.error('Error during video upload:', uploadError);
@@ -351,11 +578,9 @@ const ProductCatalogManagement = () => {
       await fetchAllProducts();
       
       console.log('Product saved successfully with ID:', productId);
-      alert('Product created successfully!');
       
     } catch (error) {
       console.error('Error saving product:', error);
-      alert('Failed to save product. Please try again.');
     }
   };
 
@@ -439,14 +664,15 @@ const ProductCatalogManagement = () => {
             <>
               {/* Products Table */}
               <ProductTable
-                products={getCurrentPageProducts()}
-                onStatusToggle={handleStatusToggle}
-                onAuctionToggle={handleAuctionToggle}
-                onEditProduct={handleEditProduct}
-                onBulkAction={handleBulkAction}
-                selectedProducts={selectedProducts}
-                onSelectProduct={handleSelectProduct}
-                onSelectAll={handleSelectAll}
+                 products={products}
+                 onStatusToggle={handleStatusToggle}
+                 onAuctionToggle={handleAuctionToggle}
+                 onEditProduct={handleEditProduct}
+                 onBulkAction={handleBulkAction}
+                 selectedProducts={selectedProducts}
+                 onSelectProduct={handleSelectProduct}
+                 onSelectAll={handleSelectAll}
+                 onCellValueUpdate={handleCellValueUpdate}
               />
 
               {/* Pagination */}
@@ -499,14 +725,26 @@ const ProductCatalogManagement = () => {
         </div>
       </main>
       
-      {/* Product Upload Modal */}
+      {/* Product Upload/Add Modal */}
       <ProductUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onSave={handleSaveProduct}
+        isEditMode={false}
+      />
+
+      {/* Product Edit Modal */}
+      <ProductUploadModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingProduct(null);
+        }}
+        onSave={handleEditSave}
+        initialData={editingProduct}
+        isEditMode={true}
       />
     </div>
   );
 };
-
 export default ProductCatalogManagement;

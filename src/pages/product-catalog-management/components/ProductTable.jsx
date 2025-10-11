@@ -4,9 +4,8 @@ import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 import ImageGalleryModal from '../../../components/ui/ImageGalleryModal';
 import ScheduleAuctionModal from '../../../components/ui/ScheduleAuctionModal';
-
-
-
+import ProductViewModal from '../../../components/ui/ProductViewModal';
+import GoLiveModal from '../../../components/ui/GoLiveModal';
 
 const ProductTable = ({ 
   products, 
@@ -16,12 +15,15 @@ const ProductTable = ({
   onBulkAction,
   selectedProducts,
   onSelectProduct,
-  onSelectAll 
+  onSelectAll,
+  onCellValueUpdate
 }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [imageGalleryModal, setImageGalleryModal] = useState({ isOpen: false, product: null });
   const [scheduleModal, setScheduleModal] = useState({ isOpen: false, product: null });
+  const [viewModal, setViewModal] = useState({ isOpen: false, product: null });
+  const [goLiveModal, setGoLiveModal] = useState({ isOpen: false, product: null });
 
   // Mock multiple images for products
   const getProductImages = (product) => {
@@ -38,11 +40,28 @@ const ProductTable = ({
     setEditValue(currentValue);
   };
 
-  const handleCellSave = (productId, field) => {
-    // Mock save functionality
-    console.log(`Saving ${field} for product ${productId}:`, editValue);
-    setEditingCell(null);
-    setEditValue('');
+  const handleCellSave = async (productId, field) => {
+    try {
+      const updateData = {
+        [field]: editValue
+      };
+
+      if (field === 'startDate' || field === 'auction_start') {
+        updateData.auction_start = editValue;
+      } else if (field === 'endDate' || field === 'auction_end') {
+        updateData.auction_end = editValue;
+      }
+
+      console.log(`Saving ${field} for product ${productId}:`, updateData);
+      onCellValueUpdate(productId, field, editValue);
+
+      setEditingCell(null);
+      setEditValue('');
+      console.log('Cell value saved successfully');
+    } catch (error) {
+      console.error('Error saving cell value:', error);
+      alert('Failed to save changes. Please try again.');
+    }
   };
 
   const handleCellCancel = () => {
@@ -54,14 +73,26 @@ const ProductTable = ({
     setImageGalleryModal({ isOpen: true, product });
   };
 
+  const handleViewProduct = (product) => {
+    setViewModal({ isOpen: true, product });
+  };
+
   const handleScheduleAuction = (product) => {
     setScheduleModal({ isOpen: true, product });
   };
 
+  const handleGoLive = (product) => {
+    setGoLiveModal({ isOpen: true, product });
+  };
+
   const handleAuctionScheduled = (auctionData) => {
     console.log('Auction scheduled:', auctionData);
-    // Update product with auction schedule
-    // In real app, this would make an API call
+  };
+
+  const handleLiveStreamStart = (liveData) => {
+    console.log('Live stream started:', liveData);
+    // Update product status to live
+    // Make API call to start live stream
   };
 
   const formatDate = (date) => {
@@ -88,6 +119,11 @@ const ProductTable = ({
         <span className="capitalize">{status}</span>
       </span>
     );
+  };
+
+  // Check if product can go live (active and has auction scheduled)
+  const canGoLive = (product) => {
+    return product?.isActive && product?.auction_start && product?.auction_end;
   };
 
   return (
@@ -265,14 +301,14 @@ const ProductTable = ({
                     <button
                       onClick={() => onStatusToggle(product?.product_id)}
                       className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        product?.isActive
+                        product?.isactive
                           ? 'bg-success/10 text-success' :'bg-secondary/10 text-secondary'
                       }`}
                     >
                       <div className={`w-2 h-2 rounded-full ${
-                        product?.isActive ? 'bg-success' : 'bg-secondary'
+                        product?.isactive ? 'bg-success' : 'bg-secondary'
                       }`} />
-                      <span>{product?.isActive ? 'Active' : 'Inactive'}</span>
+                      <span>{product?.isactive ? 'Active' : 'Inactive'}</span>
                     </button>
                   </td>
                   <td className="p-4">
@@ -288,10 +324,20 @@ const ProductTable = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => console.log('View product:', product?.product_id)}
+                        onClick={() => handleViewProduct(product)}
                         title="View Product Details"
                       >
                         <Icon name="Eye" size={16} />
+                      </Button>
+                      <Button
+                        variant={canGoLive(product) ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => handleGoLive(product)}
+                        disabled={!canGoLive(product)}
+                        title={canGoLive(product) ? "Go Live with Video Stream" : "Product must be active with scheduled auction"}
+                        className={canGoLive(product) ? "bg-red-500 hover:bg-red-600 text-white" : ""}
+                      >
+                        <Icon name="Video" size={16} />
                       </Button>
                     </div>
                   </td>
@@ -300,6 +346,7 @@ const ProductTable = ({
             </tbody>
           </table>
         </div>
+        
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-4 p-4">
           {products?.map((product) => (
@@ -319,8 +366,8 @@ const ProductTable = ({
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
-                  {/* <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p> */}
+                <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
+                  <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p>
                   <p className="text-sm text-muted-foreground">{product?.seller}</p>
                 </div>
               </div>
@@ -332,7 +379,7 @@ const ProductTable = ({
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Starting Price</p>
-                  <p className="text-sm font-medium">${product?.starting_price}</p>
+                  <p className="text-sm font-medium">₹{product?.starting_price}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Images</p>
@@ -362,27 +409,30 @@ const ProductTable = ({
 
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
-                  {getAuctionStatusBadge(product?.auctionStatus)}
+                  {/* {getAuctionStatusBadge(product?.auctionStatus)} */}
                 </div>
                 <button
                   onClick={() => onStatusToggle(product?.product_id)}
                   className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    product?.isActive
+                    product?.isactive
                       ? 'bg-success/10 text-success' :'bg-secondary/10 text-secondary'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full ${
-                    product?.isActive ? 'bg-success' : 'bg-secondary'
+                    product?.isactive ? 'bg-success' : 'bg-secondary'
                   }`} />
-                  <span>{product?.isActive ? 'Active' : 'Inactive'}</span>
+                  <span>{product?.isactive ? 'Active' : 'Inactive'}</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="space-y-2 mb-3">
                 <div className="text-xs text-muted-foreground">
                   <p>Start: {formatDate(product?.auction_start)}</p>
                   <p>End: {formatDate(product?.auction_end)}</p>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-border">
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="ghost"
@@ -395,17 +445,29 @@ const ProductTable = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => console.log('View product:', product?.product_id)}
+                    onClick={() => handleViewProduct(product)}
                     title="View Product Details"
                   >
                     <Icon name="Eye" size={16} />
                   </Button>
                 </div>
+                <Button
+                  variant={canGoLive(product) ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleGoLive(product)}
+                  disabled={!canGoLive(product)}
+                  iconName="Video"
+                  iconPosition="left"
+                  className={canGoLive(product) ? "bg-red-500 hover:bg-red-600 text-white" : ""}
+                >
+                  Go Live
+                </Button>
               </div>
             </div>
           ))}
         </div>
       </div>
+
       {/* Image Gallery Modal */}
       <ImageGalleryModal
         isOpen={imageGalleryModal?.isOpen}
@@ -413,12 +475,28 @@ const ProductTable = ({
         images={imageGalleryModal?.product ? getProductImages(imageGalleryModal?.product) : []}
         title={`${imageGalleryModal?.product?.name} - Images`}
       />
+
       {/* Schedule Auction Modal */}
       <ScheduleAuctionModal
         isOpen={scheduleModal?.isOpen}
         onClose={() => setScheduleModal({ isOpen: false, product: null })}
         product={scheduleModal?.product}
         onSchedule={handleAuctionScheduled}
+      />
+
+      {/* Product View Modal */}
+      <ProductViewModal
+        isOpen={viewModal?.isOpen}
+        onClose={() => setViewModal({ isOpen: false, product: null })}
+        product={viewModal?.product}
+      />
+
+      {/* Go Live Modal */}
+      <GoLiveModal
+        isOpen={goLiveModal?.isOpen}
+        onClose={() => setGoLiveModal({ isOpen: false, product: null })}
+        product={goLiveModal?.product}
+        onGoLive={handleLiveStreamStart}
       />
     </>
   );

@@ -5,8 +5,6 @@ import VendorStatusBadge from './VendorStatusBadge';
 import VendorDetailsModal from '../../../components/ui/VendorDetailsModal';
 import JustificationModal from '../../../components/ui/JustificationModal';
 import { updateVendorStatus } from '../../../services/posCrud';
-
-
 import { useNavigate } from 'react-router-dom';
 
 const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) => {
@@ -23,21 +21,35 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
     setJustificationModal({ isOpen: true, action: 'reject' });
   };
 
-  const handleJustificationSubmit = (data) => {
+  const handleJustificationSubmit = async (data) => {
     let actionText = "";
     if(data?.action === 'approve') {
       actionText = "approved";
-    }else{
+    } else {
       actionText = "rejected";
     }
     console.log('Justification submitted:', data);
-    const response = updateVendorStatus(vendor?.vendor_id, actionText)
-    onStatusChange(vendor?.vendor_id, data?.action);
+    
+    try {
+      const response = await updateVendorStatus(vendor?.vendor_id, actionText);
+      console.log('Status update response:', response);
+      onStatusChange(vendor?.vendor_id, data?.action);
+    } catch (error) {
+      console.error('Error updating vendor status:', error);
+    }
   };
 
-  const handleToggleActive = () => {
-    const newStatus = vendor?.isActive ? 'inactive' : 'active';
-    onStatusChange(vendor?.vendor_id, newStatus);
+  const handleToggleActive = async (vendorData) => {
+    console.log('Toggling vendor:', vendorData);
+    const newStatus = vendorData?.isActive ? 'inactive' : 'active';
+    
+    try {
+      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus);
+      console.log('Toggle response:', response);
+      onStatusChange(vendorData?.vendor_id, newStatus);
+    } catch (error) {
+      console.error('Error toggling vendor status:', error);
+    }
   };
 
   const handleViewDetails = () => {
@@ -95,8 +107,8 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
         </td>
         <td className="p-4">
           <div className="flex items-center space-x-2">
-            <VendorStatusBadge status={vendor?.approval_status } />
-            {vendor?.approval_status  === 'approved' && (
+            <VendorStatusBadge status={vendor?.approval_status} />
+            {vendor?.approval_status === 'approved' && (
               <VendorStatusBadge status={vendor?.isActive ? 'active' : 'inactive'} size="sm" />
             )}
           </div>
@@ -112,7 +124,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
               title="View Details"
             />
             
-            {vendor?.approval_status  === 'pending' && (
+            {vendor?.approval_status === 'pending' && (
               <>
                 <Button
                   variant="success"
@@ -134,11 +146,11 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
                 </Button>
               </>
             )}
-            {vendor?.approval_status  === 'approved' && (
+            {vendor?.approval_status === 'approved' && (
               <Button
                 variant={vendor?.isActive ? "outline" : "success"}
                 size="sm"
-                onClick={handleToggleActive}
+                onClick={() => handleToggleActive(vendor)}
                 iconName={vendor?.isActive ? "Pause" : "Play"}
                 title={vendor?.isActive ? 'Deactivate Vendor' : 'Activate Vendor'}
               >
@@ -148,6 +160,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
           </div>
         </td>
       </tr>
+
       {/* Mobile Card */}
       <div className="lg:hidden bg-card border border-border rounded-lg p-4 mb-4">
         <div className="flex items-start justify-between mb-3">
@@ -178,8 +191,8 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
 
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            <VendorStatusBadge status={vendor?.approval_status } />
-            {vendor?.approval_status  === 'approved' && (
+            <VendorStatusBadge status={vendor?.approval_status} />
+            {vendor?.approval_status === 'approved' && (
               <VendorStatusBadge status={vendor?.isActive ? 'active' : 'inactive'} size="sm" />
             )}
           </div>
@@ -217,7 +230,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
                 View Details
               </Button>
               
-              {vendor?.approval_status  === 'pending' && (
+              {vendor?.approval_status === 'pending' && (
                 <>
                   <Button
                     variant="success"
@@ -239,11 +252,11 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
                   </Button>
                 </>
               )}
-              {vendor?.approval_status  === 'approved' && (
+              {vendor?.approval_status === 'approved' && (
                 <Button
                   variant={vendor?.isActive ? "outline" : "success"}
                   size="sm"
-                  onClick={handleToggleActive}
+                  onClick={() => handleToggleActive(vendor)}
                   iconName={vendor?.isActive ? "Pause" : "Play"}
                   fullWidth
                 >
@@ -254,6 +267,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
           </div>
         )}
       </div>
+
       {/* Modals */}
       <VendorDetailsModal
         isOpen={showDetailsModal}
@@ -268,6 +282,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
           setShowDetailsModal(false);
         }}
       />
+      
       <JustificationModal
         isOpen={justificationModal?.isOpen}
         onClose={() => setJustificationModal({ isOpen: false, action: null })}
