@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { isAdmin, getToken, hasRole } from '@/utils/auth';
+import { isAdmin, getToken, hasRole } from '../../utils/auth';
+import React from 'react';
 
 interface ProtectedRouteProps {
   redirectPath?: string;

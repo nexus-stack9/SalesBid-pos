@@ -295,7 +295,7 @@ export const updateRecord = async <T>(
     };
 
     console.log('Making update API call with payload:', payload);
-    const response = await fetch(`${API_BASE_URL}/product/products`, {
+    const response = await fetch(`${API_BASE_URL}global/update`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(payload),
@@ -324,7 +324,7 @@ export const updateRecord = async <T>(
 
 export const updatedata = async (formName, id, data) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/update`, {
+      const response = await fetch(`${API_BASE_URL}/global/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
