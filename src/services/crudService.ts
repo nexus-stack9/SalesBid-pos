@@ -324,19 +324,24 @@ export const updateRecord = async <T>(
 
 export const updatedata = async (formName, id, data) => {
     try {
+      const payload = {
+        formName,
+        id: id,
+        ...data,
+      };
+      
+      console.log('updatedata payload:', JSON.stringify(payload, null, 2));
+      
       const response = await fetch(`${API_BASE_URL}/global/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          formName,
-          id,
-          ...data,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
+      console.log('updatedata response:', result);
       return result; // { success, message, data }
     } catch (error) {
       console.error("API updateRecord error:", error);
@@ -370,6 +375,7 @@ export const deleteRecord = async (
     const url = new URL(`${API_BASE_URL}/product/products`);
     url.searchParams.append('formName', formName);
     url.searchParams.append('id', id.toString());
+    url.searchParams.append('product_id', id.toString());
     
     console.log('Making delete API call to:', url.toString());
     const response = await fetch(url.toString(), {
