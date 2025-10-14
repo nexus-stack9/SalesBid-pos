@@ -58,7 +58,7 @@ const Breadcrumb = () => {
   return (
     <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
       {breadcrumbItems?.map((item, index) => (
-        <React.Fragment key={item?.path}>
+        <React.Fragment key={`${item?.path}-${index}`}>
           {index > 0 && (
             <Icon name="ChevronRight" size={16} className="text-border" />
           )}

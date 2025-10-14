@@ -557,7 +557,9 @@ const VendorDetailsModal = ({
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{product?.name}</p>
-                            <p className="text-sm text-muted-foreground">{product?.category} • SKU: {product?.sku}</p>
+                            <p className="text-sm text-muted-foreground">{product?.category} 
+                              {/* • SKU: {product?.sku} */}
+                              </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">

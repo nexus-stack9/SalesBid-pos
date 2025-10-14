@@ -1,28 +1,105 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import Icon from '../AppIcon';
 import Button from './Button';
+import { getAllVendors } from '../../services/posCrud';
+import { getAllProducts } from '../../services/crudService';
 
 const Header = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [vendorCount, setVendorCount] = useState(0);
+  const [productCount, setProductCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Decode JWT token and get user data
+  const decodeJWT = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Error decoding JWT:', error);
+      return null;
+    }
+  };
+
+  // Get user data from token and cache it
+  const getUserData = () => {
+    const token = Cookies.get('authToken') || Cookies.get('accessToken') || localStorage.getItem('authToken');
+
+    if (token) {
+      const decoded = decodeJWT(token);
+      if (decoded) {
+        const userData = {
+          vendorId: decoded.vendorId || decoded.userId,
+          email: decoded.email,
+          role: decoded.role,
+          name: decoded.name
+        };
+
+        // Cache user data in localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        return userData;
+      }
+    }
+
+    // Try to get from cached data
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
+      try {
+        return JSON.parse(cachedUser);
+      } catch (error) {
+        console.error('Error parsing cached user data:', error);
+      }
+    }
+
+    return null;
+  };
+
+  const userData = getUserData();
+
+  // Fetch counts on component mount
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        // Fetch vendor count
+        const vendorsResponse = await getAllVendors();
+        setVendorCount(vendorsResponse?.data?.length || 0);
+
+        // Fetch product count
+        const productsResponse = await getAllProducts('productForm');
+        setProductCount(productsResponse?.data?.length || 0);
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+        // Keep default counts of 0 if there's an error
+      }
+    };
+
+    fetchCounts();
+  }, []);
 
   const navigationItems = [
     {
       label: 'Vendors',
       path: '/vendor-management-dashboard',
       icon: 'Users',
-      badge: 12,
+      badge: vendorCount,
       subPaths: ['/document-verification-center']
     },
     {
       label: 'Products',
       path: '/product-catalog-management',
       icon: 'Package',
-      badge: 5
+      badge: productCount
     },
     {
       label: 'Orders',
@@ -48,7 +125,27 @@ const Header = () => {
 
   const handleLogout = () => {
     console.log('Logging out...');
+
+    // Clear the token from localStorage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('user');
+
+    // Clear cookies if used
+    const cookies = document.cookie.split(";");
+    for (let cookie of cookies) {
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      if (name.startsWith('auth') || name.startsWith('refresh')) {
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+      }
+    }
+
+    // Close profile menu
     setIsProfileOpen(false);
+
+    // Redirect to login page
+    navigate('/login');
   };
 
   return (
@@ -139,25 +236,31 @@ const Header = () => {
               <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
                 <Icon name="User" size={16} color="white" />
               </div>
-              <span className="hidden md:block text-sm font-medium">Admin</span>
+              <span className="hidden md:block text-sm font-medium">
+                {userData?.name || 'User'}
+              </span>
               <Icon name="ChevronDown" size={16} />
             </Button>
 
             {isProfileOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-md shadow-dropdown z-50">
                 <div className="p-3 border-b border-border">
-                  <p className="text-sm font-medium">Administrator</p>
-                  <p className="text-xs text-muted-foreground">admin@vendorhub.com</p>
+                  <p className="text-sm font-medium">
+                    {userData?.name || 'User'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {userData?.email || 'user@example.com'}
+                  </p>
                 </div>
                 <div className="py-1">
-                  <button className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2">
+                  {/* <button className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2">
                     <Icon name="Settings" size={16} />
                     <span>Settings</span>
                   </button>
                   <button className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2">
                     <Icon name="HelpCircle" size={16} />
                     <span>Help</span>
-                  </button>
+                  </button> */}
                   <hr className="my-1 border-border" />
                   <button
                     onClick={handleLogout}

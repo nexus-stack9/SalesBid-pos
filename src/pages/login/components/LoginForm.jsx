@@ -5,21 +5,22 @@ import Input from '../../../components/ui/Input';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import Icon from '../../../components/AppIcon';
 import Cookies from 'js-cookie';
+import { loginUser } from '../../../services/auth';
 
 // ✅ Define loginUser mock (replace with real API later)
-const loginUser = async ({ email, password }) => {
-  // Fake API response
-  return new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          token: 'fake-jwt-token',
-          user: { name: email.split('@')[0] },
-        }),
-      1000
-    )
-  );
-};
+// const loginUser = async ({ email, password }) => {
+//   // Fake API response
+//   return new Promise((resolve) =>
+//     setTimeout(
+//       () =>
+//         resolve({
+//           token: 'fake-jwt-token',
+//           user: { name: email.split('@')[0] },
+//         }),
+//       1000
+//     )
+//   );
+// };
 
 const LoginForm = () => {
   const navigate = useNavigate();

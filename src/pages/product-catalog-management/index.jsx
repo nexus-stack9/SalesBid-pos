@@ -9,6 +9,8 @@ import ProductUploadModal from './components/ProductUploadModal';
 import Button from '../../components/ui/Button';
 import { getAllVendors } from '../../services/posCrud';
 import { getAllProductsByVendorId } from '../../services/posCrud';
+import Cookies from 'js-cookie';
+
 import { insertRecord, uploadMultipleFiles, uploadFile, updatedata, deleteRecord } from '../../services/crudService';
 
 const ProductCatalogManagement = () => {
@@ -32,11 +34,26 @@ const ProductCatalogManagement = () => {
     totalRevenue: 245680
   };
 
+ const getUserData = () => {
+    // Try to get from cached data
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
+      try {
+        return JSON.parse(cachedUser);
+      } catch (error) {
+        console.error('Error parsing cached user data:', error);
+      }
+    }
+
+    return null;
+  };
+
   const fetchAllProducts = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await getAllProductsByVendorId(15);
+      const userData = getUserData();
+      const response = await getAllProductsByVendorId(userData?.vendorId);
       console.log("Fetched products:", response?.data);
       setProducts(response?.data || []);
       setFilteredProducts(response?.data || []);
@@ -423,7 +440,7 @@ const ProductCatalogManagement = () => {
       // Handle image uploads if any
       if (productData.imageFiles && productData.imageFiles.length > 0) {
         const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
-        const vendorId = productData.vendor_id || editingProduct?.vendor_id || 15;
+        const vendorId = getUserData()?.vendorId;
         const uploadPath = `${vendorId}/Products/${editingProduct?.product_id}`;
         
         try {
@@ -501,7 +518,7 @@ const ProductCatalogManagement = () => {
       }
       
       const productId = result.id;
-      const vendorId = productData.vendor_id || 15; // Using 15 as default based on your fetchAllProducts
+      const vendorId = getUserData()?.vendorId; // Using 15 as default based on your fetchAllProducts
       console.log('Product created with ID:', productId);
       
       // Step 2: Handle image uploads if any
