@@ -3,8 +3,15 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 // Get all products by vendorId
+
+
 export const getAllProductsByVendorId = async (vendorId) => {
-  return axios.get(`${API_BASE_URL}/pos/getAllProductsByVendorId/${vendorId}`);
+  try {
+    const response = await axios.get(`${API_BASE_URL}/pos/getAllProductsByVendorId/${vendorId}`);
+    return response;
+  } catch (error) {
+    throw error;
+  }
 };
 
 

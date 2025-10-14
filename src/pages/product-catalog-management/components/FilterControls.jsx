@@ -51,11 +51,11 @@ const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
 
   const priceRanges = [
     { value: '', label: 'All Prices' },
-    { value: '0-50', label: '$0 - $50' },
-    { value: '50-100', label: '$50 - $100' },
-    { value: '100-500', label: '$100 - $500' },
-    { value: '500-1000', label: '$500 - $1,000' },
-    { value: '1000+', label: '$1,000+' }
+    { value: '0-50', label: '₹0 - ₹50' },
+    { value: '50-100', label: '₹50 - ₹100' },
+    { value: '100-500', label: '₹100 - ₹500' },
+    { value: '500-1000', label: '₹500 - ₹1,000' },
+    { value: '1000+', label: '₹1,000+' }
   ];
 
   const handleFilterChange = (key, value) => {

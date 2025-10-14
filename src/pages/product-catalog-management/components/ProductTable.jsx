@@ -16,7 +16,8 @@ const ProductTable = ({
   selectedProducts,
   onSelectProduct,
   onSelectAll,
-  onCellValueUpdate
+  onCellValueUpdate,
+  onAuctionSchedule
 }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -85,8 +86,12 @@ const ProductTable = ({
     setGoLiveModal({ isOpen: true, product });
   };
 
-  const handleAuctionScheduled = (auctionData) => {
+  const handleAuctionScheduled = async (auctionData) => {
     console.log('Auction scheduled:', auctionData);
+    if (onAuctionSchedule) {
+      await onAuctionSchedule(auctionData);
+    }
+    setScheduleModal({ isOpen: false, product: null });
   };
 
   const handleLiveStreamStart = (liveData) => {

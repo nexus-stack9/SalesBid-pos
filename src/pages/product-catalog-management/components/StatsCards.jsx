@@ -32,7 +32,7 @@ const StatsCards = ({ stats }) => {
       value: `₹${stats?.totalRevenue?.toLocaleString()}`,
       change: '+23%',      
       changeType: 'positive',
-      icon: 'DollarSign',
+      icon: 'IndianRupee',
       color: 'bg-accent/10 text-accent'
     }
   ];
