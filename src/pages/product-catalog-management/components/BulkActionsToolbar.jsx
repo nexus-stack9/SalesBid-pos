@@ -176,7 +176,7 @@ const BulkActionsToolbar = ({
           </div>
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Total Value</p>
-            <p className="text-lg font-semibold text-foreground">$24,580</p>
+            <p className="text-lg font-semibold text-foreground">₹24,580</p>
           </div>
         </div>
       </div>

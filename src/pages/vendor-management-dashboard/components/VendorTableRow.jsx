@@ -71,7 +71,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
   return (
     <>
       {/* Desktop Row */}
-      <tr className="hidden lg:table-row border-b border-border hover:bg-muted/50 transition-colors">
+      <tr className="border-b border-border hover:bg-muted/50 transition-colors">
         <td className="p-4">
           <input
             type="checkbox"
@@ -161,8 +161,93 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
         </td>
       </tr>
 
-      {/* Mobile Card */}
-      <div className="lg:hidden bg-card border border-border rounded-lg p-4 mb-4">
+      {/* Modals */}
+      <VendorDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        vendor={vendor}
+        onStatusChange={(vendorId, action) => {
+          if (action === 'approve' || action === 'reject') {
+            setJustificationModal({ isOpen: true, action });
+          } else {
+            onStatusChange(vendorId, action);
+          }
+          setShowDetailsModal(false);
+        }}
+      />
+      
+      <JustificationModal
+        isOpen={justificationModal?.isOpen}
+        onClose={() => setJustificationModal({ isOpen: false, action: null })}
+        onSubmit={handleJustificationSubmit}
+        action={justificationModal?.action}
+        vendor={vendor}
+      />
+    </>
+  );
+};
+
+// Mobile Card Component
+export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelected }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [justificationModal, setJustificationModal] = useState({ isOpen: false, action: null });
+  const navigate = useNavigate();
+
+  const handleApprove = () => {
+    setJustificationModal({ isOpen: true, action: 'approve' });
+  };
+
+  const handleReject = () => {
+    setJustificationModal({ isOpen: true, action: 'reject' });
+  };
+
+  const handleJustificationSubmit = async (data) => {
+    let actionText = "";
+    if(data?.action === 'approve') {
+      actionText = "approved";
+    } else {
+      actionText = "rejected";
+    }
+    console.log('Justification submitted:', data);
+    
+    try {
+      const response = await updateVendorStatus(vendor?.vendor_id, actionText);
+      console.log('Status update response:', response);
+      onStatusChange(vendor?.vendor_id, data?.action);
+    } catch (error) {
+      console.error('Error updating vendor status:', error);
+    }
+  };
+
+  const handleToggleActive = async (vendorData) => {
+    console.log('Toggling vendor:', vendorData);
+    const newStatus = vendorData?.isActive ? 'inactive' : 'active';
+    
+    try {
+      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus);
+      console.log('Toggle response:', response);
+      onStatusChange(vendorData?.vendor_id, newStatus);
+    } catch (error) {
+      console.error('Error toggling vendor status:', error);
+    }
+  };
+
+  const handleViewDetails = () => {
+    setShowDetailsModal(true);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString)?.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <>
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-3">
             <input

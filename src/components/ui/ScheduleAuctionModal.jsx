@@ -11,13 +11,26 @@ const ScheduleAuctionModal = ({
   product,
   initialData = null 
 }) => {
+  // Format dates from product data if available
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  };
+
+  const formatTimeForInput = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toTimeString().slice(0, 5); // Returns HH:MM
+  };
+
   const [formData, setFormData] = useState({
-    startDate: initialData?.startDate || '',
-    endDate: initialData?.endDate || '',
-    startTime: initialData?.startTime || '09:00',
-    endTime: initialData?.endTime || '17:00',
-    minBid: initialData?.minBid || product?.startingPrice || '',
-    description: initialData?.description || ''
+    startDate: initialData?.startDate || formatDateForInput(product?.auction_start) || '',
+    endDate: initialData?.endDate || formatDateForInput(product?.auction_end) || '',
+    startTime: initialData?.startTime || formatTimeForInput(product?.auction_start) || '09:00',
+    endTime: initialData?.endTime || formatTimeForInput(product?.auction_end) || '17:00',
+    minBid: initialData?.minBid || product?.starting_price || product?.startingPrice || '',
+    description: initialData?.description || product?.description || ''
   });
   
   const [errors, setErrors] = useState({});
@@ -72,13 +85,18 @@ const ScheduleAuctionModal = ({
     
     try {
       const auctionData = {
-        productId: product?.id,
+        productId: product?.product_id || product?.id,
         startDateTime: new Date(`${formData.startDate}T${formData.startTime}`),
         endDateTime: new Date(`${formData.endDate}T${formData.endTime}`),
         minBid: parseFloat(formData?.minBid),
-        description: formData?.description
+        description: formData?.description,
+        // Include additional product data for reference
+        productName: product?.name,
+        category: product?.category,
+        location: product?.location
       };
       
+      console.log('Scheduling auction with data:', auctionData);
       await onSchedule(auctionData);
       onClose();
     } catch (error) {
@@ -91,12 +109,12 @@ const ScheduleAuctionModal = ({
 
   const handleClose = () => {
     setFormData({
-      startDate: '',
-      endDate: '',
-      startTime: '09:00',
-      endTime: '17:00',
-      minBid: product?.startingPrice || '',
-      description: ''
+      startDate: formatDateForInput(product?.auction_start) || '',
+      endDate: formatDateForInput(product?.auction_end) || '',
+      startTime: formatTimeForInput(product?.auction_start) || '09:00',
+      endTime: formatTimeForInput(product?.auction_end) || '17:00',
+      minBid: product?.starting_price || product?.startingPrice || '',
+      description: product?.description || ''
     });
     setErrors({});
     onClose();
@@ -116,21 +134,43 @@ const ScheduleAuctionModal = ({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Name:</span>
-              <span className="ml-2 text-foreground">{product?.name}</span>
+              <span className="ml-2 text-foreground font-medium">{product?.name}</span>
             </div>
-            {/* <div>
-              <span className="text-muted-foreground">SKU:</span>
-              <span className="ml-2 text-foreground">{product?.sku}</span>
-            </div> */}
+            <div>
+              <span className="text-muted-foreground">Product ID:</span>
+              <span className="ml-2 text-foreground">#{product?.product_id}</span>
+            </div>
             <div>
               <span className="text-muted-foreground">Starting Price:</span>
-              <span className="ml-2 text-foreground">${product?.startingPrice}</span>
+              <span className="ml-2 text-foreground font-medium">₹{product?.starting_price || product?.startingPrice}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Category:</span>
               <span className="ml-2 text-foreground">{product?.category}</span>
             </div>
+            <div>
+              <span className="text-muted-foreground">Quantity:</span>
+              <span className="ml-2 text-foreground">{product?.quantity}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Condition:</span>
+              <span className="ml-2 text-foreground capitalize">{product?.condition}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Location:</span>
+              <span className="ml-2 text-foreground">{product?.location}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Shipping:</span>
+              <span className="ml-2 text-foreground capitalize">{product?.shipping}</span>
+            </div>
           </div>
+          {product?.description && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <span className="text-muted-foreground text-xs">Description:</span>
+              <p className="text-foreground text-sm mt-1">{product?.description}</p>
+            </div>
+          )}
         </div>
 
         {/* Auction Schedule */}

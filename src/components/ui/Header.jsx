@@ -3,8 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import Icon from '../AppIcon';
 import Button from './Button';
-import { getAllVendors } from '../../services/posCrud';
-import { getAllProducts } from '../../services/crudService';
+import { getAllVendors, getAllProductsByVendorId } from '../../services/posCrud';
 
 const Header = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -75,9 +74,11 @@ const Header = () => {
         const vendorsResponse = await getAllVendors();
         setVendorCount(vendorsResponse?.data?.length || 0);
 
-        // Fetch product count
-        const productsResponse = await getAllProducts('productForm');
-        setProductCount(productsResponse?.data?.length || 0);
+        // Fetch product count by vendor ID
+        if (userData?.vendorId) {
+          const productsResponse = await getAllProductsByVendorId(userData.vendorId);
+          setProductCount(productsResponse?.data?.length || 0);
+        }
       } catch (error) {
         console.error('Error fetching counts:', error);
         // Keep default counts of 0 if there's an error
@@ -85,7 +86,7 @@ const Header = () => {
     };
 
     fetchCounts();
-  }, []);
+  }, [userData?.vendorId]);
 
   const navigationItems = [
     {

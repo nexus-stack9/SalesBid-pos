@@ -1,5 +1,5 @@
 import React from 'react';
-import VendorTableRow from './VendorTableRow';
+import VendorTableRow, { VendorMobileCard } from './VendorTableRow';
 import Icon from '../../../components/AppIcon';
 
 const VendorTable = ({ 
@@ -110,7 +110,7 @@ const VendorTable = ({
       {/* Mobile Cards */}
       <div className="lg:hidden p-4 space-y-4">
         {vendors?.map((vendor) => (
-          <VendorTableRow
+          <VendorMobileCard
             key={vendor?.id}
             vendor={vendor}
             onStatusChange={onStatusChange}

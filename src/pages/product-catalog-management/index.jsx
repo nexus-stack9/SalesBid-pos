@@ -48,27 +48,61 @@ const ProductCatalogManagement = () => {
     return null;
   };
 
-  const fetchAllProducts = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const userData = getUserData();
-      const response = await getAllProductsByVendorId(userData?.vendorId);
-      console.log("Fetched products:", response?.data);
-      setProducts(response?.data || []);
-      setFilteredProducts(response?.data || []);
-    } catch (err) {
-      if (err.response?.status === 204) {
-        setProducts([]);
-        setFilteredProducts([]);
-      } else {
-        setError("Failed to load products");
-        console.error("Error fetching products:", err);
-      }
-    } finally {
+ const fetchAllProducts = async () => {
+  setIsLoading(true);
+  setError(null);
+  try {
+    const userData = getUserData();
+    
+    // DEBUG: Check if vendorId exists
+    console.log("userData:", userData);
+    console.log("vendorId:", userData?.vendorId);
+    
+    if (!userData?.vendorId) {
+      setError("Vendor ID not found");
+      setProducts([]);
+      setFilteredProducts([]);
       setIsLoading(false);
+      return;
     }
-  };
+
+    const response = await getAllProductsByVendorId(userData.vendorId);
+    
+    // DEBUG: Check response
+    console.log("Full response:", response);
+    console.log("Response data:", response?.data);
+    console.log("Response status:", response?.status);
+    
+    // Handle successful response
+    if (response?.data && Array.isArray(response.data)) {
+      setProducts(response.data);
+      setFilteredProducts(response.data);
+      console.log(`✅ Loaded ${response.data.length} products`);
+    } else {
+      setProducts([]);
+      setFilteredProducts([]);
+      console.log("⚠️ No products found or invalid data format");
+    }
+    
+  } catch (err) {
+    console.error("❌ Error details:", err);
+    console.error("Error response:", err.response);
+    console.error("Error status:", err.response?.status);
+    
+    if (err.response?.status === 204) {
+      // No content - this is actually a success case
+      console.log("ℹ️ 204: No products available for this vendor");
+      setProducts([]);
+      setFilteredProducts([]);
+    } else {
+      setError(err.response?.data?.error || "Failed to load products");
+      setProducts([]);
+      setFilteredProducts([]);
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchAllProducts();
@@ -210,6 +244,62 @@ const ProductCatalogManagement = () => {
       const currentPageProducts = getCurrentPageProducts();
       const currentPageIds = currentPageProducts?.map(product => product?.product_id);
       setSelectedProducts(prev => prev?.filter(id => !currentPageIds?.includes(id)));
+    }
+  };
+
+  const handleAuctionSchedule = async (auctionData) => {
+    try {
+      console.log('Scheduling auction with data:', auctionData);
+
+      // Prepare update data for the product
+      const updateData = {
+        auction_start: auctionData.startDateTime.toISOString(),
+        auction_end: auctionData.endDateTime.toISOString(),
+        starting_price: auctionData.minBid,
+        auction_status: 'scheduled',
+        auctionstatus: 'scheduled'
+      };
+
+      console.log('Update data:', updateData);
+
+      // Update in database
+      const result = await updatedata('productForm', auctionData.productId, updateData);
+
+      if (!result.success) {
+        console.error('Failed to schedule auction:', result.message);
+        alert('Failed to schedule auction. Please try again.');
+        return;
+      }
+
+      // Update local state
+      setProducts(prev => prev?.map(product =>
+        product?.product_id === auctionData.productId
+          ? { 
+              ...product, 
+              auction_start: auctionData.startDateTime.toISOString(),
+              auction_end: auctionData.endDateTime.toISOString(),
+              starting_price: auctionData.minBid,
+              auctionstatus: 'scheduled'
+            }
+          : product
+      ));
+      setFilteredProducts(prev => prev?.map(product =>
+        product?.product_id === auctionData.productId
+          ? { 
+              ...product, 
+              auction_start: auctionData.startDateTime.toISOString(),
+              auction_end: auctionData.endDateTime.toISOString(),
+              starting_price: auctionData.minBid,
+              auctionstatus: 'scheduled'
+            }
+          : product
+      ));
+
+      console.log('✅ Auction scheduled successfully');
+      alert('Auction scheduled successfully!');
+    } catch (error) {
+      console.error('Error scheduling auction:', error);
+      alert('Failed to schedule auction. Please try again.');
     }
   };
 
@@ -690,6 +780,7 @@ const ProductCatalogManagement = () => {
                  onSelectProduct={handleSelectProduct}
                  onSelectAll={handleSelectAll}
                  onCellValueUpdate={handleCellValueUpdate}
+                 onAuctionSchedule={handleAuctionSchedule}
               />
 
               {/* Pagination */}
