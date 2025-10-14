@@ -21,7 +21,7 @@ const ProductViewModal = ({ isOpen, onClose, product }) => {
           </div>
           <div className="flex-1">
             <h3 className="text-xl font-semibold text-foreground mb-2">{product?.name}</h3>
-            <p className="text-sm text-muted-foreground mb-1">SKU: {product?.sku}</p>
+            {/* <p className="text-sm text-muted-foreground mb-1">SKU: {product?.sku}</p> */}
             <p className="text-sm text-muted-foreground">Category: {product?.category}</p>
           </div>
         </div>

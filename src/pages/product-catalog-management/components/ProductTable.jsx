@@ -175,7 +175,7 @@ const ProductTable = ({
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{product?.name}</p>
-                        <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p>
+                        {/* <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p> */}
                       </div>
                     </div>
                   </td>
@@ -367,7 +367,7 @@ const ProductTable = ({
                 </div>
                 <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
-                  <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p>
+                  {/* <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p> */}
                   <p className="text-sm text-muted-foreground">{product?.seller}</p>
                 </div>
               </div>

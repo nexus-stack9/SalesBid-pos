@@ -353,7 +353,7 @@ const GoLiveModalAdvanced = ({ isOpen, onClose, product, onGoLive }) => {
                       />
                       <div>
                         <p className="font-medium text-white">{product?.name}</p>
-                        <p className="text-sm text-gray-400">SKU: {product?.sku}</p>
+                        {/* <p className="text-sm text-gray-400">SKU: {product?.sku}</p> */}
                         <p className="text-sm text-green-400">Starting: ₹{product?.starting_price}</p>
                       </div>
                     </div>
@@ -514,7 +514,7 @@ const GoLiveModalAdvanced = ({ isOpen, onClose, product, onGoLive }) => {
                 />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-foreground truncate">{product?.name}</h4>
-                  <p className="text-xs text-muted-foreground mt-1">SKU: {product?.sku}</p>
+                  {/* <p className="text-xs text-muted-foreground mt-1">SKU: {product?.sku}</p> */}
                   <div className="mt-2 space-y-1">
                     <p className="text-sm text-muted-foreground">
                       Starting: <span className="font-medium text-foreground">₹{product?.starting_price}</span>

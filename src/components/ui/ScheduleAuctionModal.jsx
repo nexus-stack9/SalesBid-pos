@@ -118,10 +118,10 @@ const ScheduleAuctionModal = ({
               <span className="text-muted-foreground">Name:</span>
               <span className="ml-2 text-foreground">{product?.name}</span>
             </div>
-            <div>
+            {/* <div>
               <span className="text-muted-foreground">SKU:</span>
               <span className="ml-2 text-foreground">{product?.sku}</span>
-            </div>
+            </div> */}
             <div>
               <span className="text-muted-foreground">Starting Price:</span>
               <span className="ml-2 text-foreground">${product?.startingPrice}</span>
