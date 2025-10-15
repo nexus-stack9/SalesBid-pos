@@ -31,7 +31,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
     console.log('Justification submitted:', data);
     
     try {
-      const response = await updateVendorStatus(vendor?.vendor_id, actionText);
+      const response = await updateVendorStatus(vendor?.vendor_id, actionText,data?.justification);
       console.log('Status update response:', response);
       onStatusChange(vendor?.vendor_id, data?.action);
     } catch (error) {
@@ -44,7 +44,7 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
     const newStatus = vendorData?.isActive ? 'inactive' : 'active';
     
     try {
-      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus);
+      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus,data?.justification);
       console.log('Toggle response:', response);
       onStatusChange(vendorData?.vendor_id, newStatus);
     } catch (error) {
@@ -212,7 +212,7 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
     console.log('Justification submitted:', data);
     
     try {
-      const response = await updateVendorStatus(vendor?.vendor_id, actionText);
+      const response = await updateVendorStatus(vendor?.vendor_id, actionText,data?.justification);
       console.log('Status update response:', response);
       onStatusChange(vendor?.vendor_id, data?.action);
     } catch (error) {
@@ -225,7 +225,7 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
     const newStatus = vendorData?.isActive ? 'inactive' : 'active';
     
     try {
-      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus);
+      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus,data?.justification);
       console.log('Toggle response:', response);
       onStatusChange(vendorData?.vendor_id, newStatus);
     } catch (error) {

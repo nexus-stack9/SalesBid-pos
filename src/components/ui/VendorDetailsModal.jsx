@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import Icon from '../AppIcon';
 import Image from '../AppImage';
 import VendorStatusBadge from '../../pages/vendor-management-dashboard/components/VendorStatusBadge';
+import { getAllProductsByVendorId } from '../../services/posCrud';
 
 const VendorDetailsModal = ({
   isOpen,
@@ -17,6 +18,8 @@ const VendorDetailsModal = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   if (!vendor) return null;
 
@@ -31,7 +34,7 @@ const VendorDetailsModal = ({
   const tabs = [
     { id: 'overview', label: 'Overview', icon: 'User' },
     { id: 'documents', label: 'Documents', icon: 'FileText' },
-    { id: 'products', label: 'Products', icon: 'Package' }
+    ...(vendor?.approval_status === 'approved' ? [{ id: 'products', label: 'Products', icon: 'Package' }] : [])
   ];
 
   const mockDocuments = [
@@ -96,15 +99,42 @@ const VendorDetailsModal = ({
     }
   ];
 
-  const categories = ['all', ...new Set(mockProducts.map(p => p.category))];
+  // Fetch products when modal opens for approved vendors
+  useEffect(() => {
+    const fetchProducts = async () => {
+     
+
+      if (isOpen && vendor?.approval_status === 'approved' && vendor?.vendor_id) {
+        console.log('✅ VendorDetailsModal: All conditions met, calling API...');
+        setLoading(true);
+        try {
+          const response = await getAllProductsByVendorId(vendor.vendor_id);
+         
+          setProducts(response.data || []);
+        } catch (error) {
+          console.error('❌ VendorDetailsModal: API call failed:', error);
+          console.error('❌ VendorDetailsModal: Error details:', error.response || error.message);
+          setProducts([]);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        console.log('❌ VendorDetailsModal: Conditions not met for API call');
+      }
+    };
+
+    fetchProducts();
+  }, [isOpen, vendor?.approval_status, vendor?.vendor_id]);
+
+  const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))];
 
   // Filter products based on search and filters
-  const filteredProducts = mockProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          product.sku.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          product.product_id?.toString().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus;
-    
+
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
@@ -278,7 +308,7 @@ const VendorDetailsModal = ({
           <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold text-foreground">{vendor?.business_name}</h2>
-              <VendorStatusBadge status={vendor?.status} isActive={vendor?.isActive} />
+              <VendorStatusBadge status={vendor?.approval_status} isActive={vendor?.isActive} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
@@ -295,7 +325,7 @@ const VendorDetailsModal = ({
               </div>
               <div>
                 <span className="text-muted-foreground">Category:</span>
-                <span className="ml-2 text-foreground">{vendor?.category}</span>
+                <span className="ml-2 text-foreground">{vendor?.items_category}</span>
               </div>
             </div>
           </div>
@@ -336,7 +366,7 @@ const VendorDetailsModal = ({
                   <div className="space-y-1">
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Registration Date</span>
-                      <span style={styles.infoValue}>{formatDate(vendor?.created_date_time)}</span>
+                      <span style={styles.infoValue}>{formatDate(vendor?.created_at)}</span>
                     </div>
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Business Type</span>
@@ -348,7 +378,7 @@ const VendorDetailsModal = ({
                     </div>
                     <div style={{...styles.infoRow, borderBottom: 'none'}}>
                       <span style={styles.infoLabel}>Business Category</span>
-                      <span style={styles.infoValue}>{vendor?.category || 'N/A'}</span>
+                      <span style={styles.infoValue}>{vendor?.items_category || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
@@ -364,9 +394,9 @@ const VendorDetailsModal = ({
                       <span style={styles.infoLabel}>Verification Status</span>
                       <span style={styles.infoValue}>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          vendor?.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          vendor?.approval_status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {vendor?.status === 'approved' ? 'Verified' : 'Pending Verification'}
+                          {vendor?.approval_status === 'approved' ? 'Verified' : 'Pending Verification'}
                         </span>
                       </span>
                     </div>
@@ -382,7 +412,7 @@ const VendorDetailsModal = ({
                     </div>
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Products Listed</span>
-                      <span style={styles.infoValue}>{mockProducts?.length}</span>
+                      <span style={styles.infoValue}>{products?.length || 0}</span>
                     </div>
                     <div style={{...styles.infoRow, borderBottom: 'none'}}>
                       <span style={styles.infoLabel}>Total Documents</span>
@@ -502,10 +532,13 @@ const VendorDetailsModal = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-foreground">Product Catalog</h3>
-                <Button variant="outline" size="sm">
-                  <Icon name="Plus" size={16} />
-                  Add Product
-                </Button>
+                {loading ? (
+                  <div className="text-sm text-muted-foreground">Loading products...</div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
+                  </div>
+                )}
               </div>
 
               {/* Search and Filter Section */}
@@ -543,88 +576,148 @@ const VendorDetailsModal = ({
 
               {/* Products List */}
               <div className="space-y-3">
-                {filteredProducts.length === 0 ? (
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Icon name="Loader2" size={24} className="animate-spin mx-auto mb-2" />
+                    Loading products...
+                  </div>
+                ) : filteredProducts.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No products found matching your criteria.
                   </div>
                 ) : (
                   filteredProducts.map((product) => (
-                    <div key={product?.id} className="border border-border rounded-lg">
+                    <div key={product?.product_id} className="border border-border rounded-lg">
                       <div className="flex items-center justify-between p-4">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                            <Icon name="Package" size={20} className="text-muted-foreground" />
+                          <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                            {product?.image_path ? (
+                              <img
+                                src={product.image_path}
+                                alt={product?.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Icon name="Package" size={20} className="text-muted-foreground" />
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{product?.name}</p>
-                            <p className="text-sm text-muted-foreground">{product?.category} 
-                              {/* • SKU: {product?.sku} */}
-                              </p>
+                            <p className="text-sm text-muted-foreground">
+                              ID: {product?.product_id} • {product?.category}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="font-medium text-foreground">₹{product?.price.toLocaleString('en-IN')}</p>
+                            <p className="font-medium text-foreground">₹{product?.starting_price}</p>
                             <p className={`text-xs ${product?.status === 'active' ? 'text-success' : 'text-muted-foreground'}`}>
                               {product?.status}
                             </p>
                           </div>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
-                            onClick={() => toggleProductExpansion(product?.id)}
+                            onClick={() => toggleProductExpansion(product?.product_id)}
                           >
-                            <Icon name={expandedProduct === product?.id ? 'ChevronUp' : 'Eye'} size={16} />
+                            <Icon name={expandedProduct === product?.product_id ? 'ChevronUp' : 'Eye'} size={16} />
                           </Button>
                         </div>
                       </div>
-                      
+
                       {/* Expanded Product Details */}
-                      {expandedProduct === product?.id && (
+                      {expandedProduct === product?.product_id && (
                         <div className="border-t border-border bg-gray-50 p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
                               <h4 className="font-semibold text-foreground mb-3">Product Details</h4>
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Brand:</span>
-                                  <span className="text-foreground">{product?.brand}</span>
+                                  <span className="text-muted-foreground">Description:</span>
+                                  <span className="text-foreground">{product?.description || 'N/A'}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Weight:</span>
-                                  <span className="text-foreground">{product?.weight}</span>
+                                  <span className="text-muted-foreground">Location:</span>
+                                  <span className="text-foreground">{product?.location || 'N/A'}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Dimensions:</span>
-                                  <span className="text-foreground">{product?.dimensions}</span>
+                                  <span className="text-muted-foreground">Shipping:</span>
+                                  <span className="text-foreground">{product?.shipping || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Quantity:</span>
+                                  <span className="text-foreground">{product?.quantity || 0}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Retail Value:</span>
+                                  <span className="text-foreground">₹{product?.retail_value || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Condition:</span>
+                                  <span className="text-foreground">{product?.condition || 'N/A'}</span>
                                 </div>
                               </div>
                             </div>
                             <div>
-                              <h4 className="font-semibold text-foreground mb-3">Inventory</h4>
+                              <h4 className="font-semibold text-foreground mb-3">Auction Details</h4>
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Stock:</span>
-                                  <span className={`font-medium ${product?.stock > 0 ? 'text-success' : 'text-red-600'}`}>
-                                    {product?.stock} units
+                                  <span className="text-muted-foreground">Start Date:</span>
+                                  <span className="text-foreground">
+                                    {product?.auction_start ? new Date(product.auction_start).toLocaleDateString() : 'N/A'}
                                   </span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Status:</span>
+                                  <span className="text-muted-foreground">End Date:</span>
+                                  <span className="text-foreground">
+                                    {product?.auction_end ? new Date(product.auction_end).toLocaleDateString() : 'N/A'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Current Bid:</span>
+                                  <span className="text-foreground font-medium">
+                                    ₹{product?.bid_amount || product?.starting_price || '0'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Buy Option:</span>
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                    product?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                    product?.buy_option === 1 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {product?.status}
+                                    {product?.buy_option === 1 ? 'Available' : 'Not Available'}
                                   </span>
                                 </div>
                               </div>
                             </div>
-                            <div className="md:col-span-2">
-                              <h4 className="font-semibold text-foreground mb-2">Description</h4>
-                              <p className="text-sm text-muted-foreground">{product?.description}</p>
-                            </div>
                           </div>
-                          <div className="flex justify-end mt-4 space-x-2">
+
+                          {/* Bids Section */}
+                          {product?.bids && product.bids.length > 0 && (
+                            <div className="mb-4">
+                              <h4 className="font-semibold text-foreground mb-3">Recent Bids</h4>
+                              <div className="space-y-2">
+                                {product.bids.map((bid, index) => (
+                                  <div key={index} className="bg-white border border-border rounded-lg p-3">
+                                    <div className="flex justify-between items-center text-sm">
+                                      <span className="text-muted-foreground">
+                                        Bidder: {bid?.user_name || 'Anonymous'}
+                                      </span>
+                                      <span className="font-medium text-foreground">
+                                        ₹{bid?.bid_amount || '0'}
+                                      </span>
+                                    </div>
+                                    {bid?.bid_time && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        {new Date(bid.bid_time).toLocaleString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm">
                               <Icon name="Edit" size={14} />
                               Edit Product
@@ -645,11 +738,11 @@ const VendorDetailsModal = ({
         </div>
 
         {/* Action Buttons */}
-        {vendor?.status === 'pending' && (
+        {vendor?.approval_status === 'pending' && (
           <div className="flex justify-end space-x-3 pt-6 border-t border-border">
             <Button
               variant="outline"
-              onClick={() => onStatusChange?.(vendor?.id, 'reject')}
+              onClick={() => onStatusChange?.(vendor?.vendor_id, 'reject')}
               iconName="X"
               iconPosition="left"
             >
@@ -657,7 +750,7 @@ const VendorDetailsModal = ({
             </Button>
             <Button
               variant="default"
-              onClick={() => onStatusChange?.(vendor?.id, 'approve')}
+              onClick={() => onStatusChange?.(vendor?.vendor_id, 'approve')}
               iconName="Check"
               iconPosition="left"
             >

@@ -7,9 +7,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 export const getAllProductsByVendorId = async (vendorId) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/pos/getAllProductsByVendorId/${vendorId}`);
+    console.log('🚀 posCrud: getAllProductsByVendorId called with vendorId:', vendorId);
+    console.log('🌐 posCrud: API_BASE_URL:', API_BASE_URL);
+    const url = `${API_BASE_URL}/pos/getAllProductsByVendorId/${vendorId}`;
+    console.log('📡 posCrud: Making request to:', url);
+
+    const response = await axios.get(url);
+    console.log('✅ posCrud: Response received:', response);
     return response;
   } catch (error) {
+    console.error('❌ posCrud: getAllProductsByVendorId failed:', error);
+    console.error('❌ posCrud: Error response:', error.response);
     throw error;
   }
 };
@@ -20,9 +28,9 @@ export const getAllVendors = async () => {
 };
 
 
-export const updateVendorStatus = async (vendorId, status) => {
+export const updateVendorStatus = async (vendorId, status,justification) => {
   try {
-    const response = await axios.put(`${API_BASE_URL}/pos/updateVendorStatus/${vendorId}/status/${status}`)
+    const response = await axios.put(`${API_BASE_URL}/pos/updateVendorStatus/${vendorId}/status/${status}/justification/${justification}`)
     return response.data;
   } catch (error) {
     console.error("Error updating vendor status:", error);

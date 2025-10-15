@@ -626,20 +626,24 @@ const ProductCatalogManagement = () => {
           
           if (uploadRes.success) {
             console.log('Images uploaded successfully');
-            
-            // Set the first image as the main image path
-            mainImagePath = `${filePathPrefix}/${uploadPath}/${productData.imageFiles[0].name}`;
-            
-            // Update product record with main image path
+
+            // Create comma-separated string of all image paths
+            const allImagePaths = productData.imageFiles.map((file, index) => {
+              return `${filePathPrefix}/${uploadPath}/${file.name}`;
+            }).join(',');
+
+            console.log('All image paths:', allImagePaths);
+
+            // Update product record with all image paths
             const updateData = {
-              image_path: mainImagePath
+              image_path: allImagePaths
             };
-            
-            console.log('Updating product with image path:', updateData);
+
+            console.log('Updating product with image paths:', updateData);
             const updateRes = await updatedata('productForm', productId, updateData);
-            
+
             if (!updateRes.success) {
-              console.error('Failed to update product with image path:', updateRes.error);
+              console.error('Failed to update product with image paths:', updateRes.error);
             }
           } else {
             console.error('Image upload failed:', uploadRes.error);
@@ -675,7 +679,7 @@ const ProductCatalogManagement = () => {
         ...productFormData,
         product_id: productId,
         id: productId,
-        image_path: mainImagePath
+        image_path: allImagePaths || ''
       };
       
       setProducts(prev => [newProductWithId, ...prev]);
