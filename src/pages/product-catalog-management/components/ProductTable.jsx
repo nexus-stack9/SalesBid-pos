@@ -26,14 +26,26 @@ const ProductTable = ({
   const [viewModal, setViewModal] = useState({ isOpen: false, product: null });
   const [goLiveModal, setGoLiveModal] = useState({ isOpen: false, product: null });
 
-  // Mock multiple images for products
+  // Get the first image URL from comma-separated string for main display
+  const getMainImageUrl = (product) => {
+    if (!product?.image_path) return null;
+
+    const imageUrls = product.image_path.split(',').map(url => url.trim());
+    return imageUrls[0] || null;
+  };
+
+  // Parse product images from comma-separated image_path string
   const getProductImages = (product) => {
-    return [
-      product?.image_path,
-      `${product?.image_path}?variant=2`,
-      `${product?.image_path}?variant=3`,
-      `${product?.image_path}?variant=4`
-    ];
+    if (!product?.image_path) return [];
+
+    // Split the comma-separated string into individual image URLs
+    const imageUrls = product.image_path.split(',').map(url => url.trim());
+
+    // Return array of image objects for the gallery
+    return imageUrls.map((url, index) => ({
+      url: url,
+      alt: `${product?.name} - Image ${index + 1}`
+    }));
   };
 
   const handleCellEdit = (productId, field, currentValue) => {
@@ -173,7 +185,7 @@ const ProductTable = ({
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                         <Image
-                          src={product?.image_path}
+                          src={getMainImageUrl(product)}
                           alt={product?.name}
                           className="w-full h-full object-cover"
                         />
@@ -365,7 +377,7 @@ const ProductTable = ({
                 />
                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                   <Image
-                    src={product?.image_path}
+                    src={getMainImageUrl(product)}
                     alt={product?.name}
                     className="w-full h-full object-cover"
                   />

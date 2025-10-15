@@ -1,7 +1,7 @@
 import React from 'react';
 
-const VendorStatusBadge = ({ status, size = 'default' }) => {
-  const getStatusConfig = (status) => {
+const VendorStatusBadge = ({ status, isActive, size = 'default' }) => {
+  const getStatusConfig = (status, isActive) => {
     switch (status?.toLowerCase()) {
       case 'pending':
         return {
@@ -29,7 +29,7 @@ const VendorStatusBadge = ({ status, size = 'default' }) => {
           bg: 'bg-success/10',
           text: 'text-success',
           border: 'border-success/20',
-          label: 'Active'
+          label: isActive !== false ? 'Active' : 'Inactive'
         };
       case 'inactive':
         return {
@@ -43,12 +43,12 @@ const VendorStatusBadge = ({ status, size = 'default' }) => {
           bg: 'bg-muted',
           text: 'text-muted-foreground',
           border: 'border-border',
-          label: status
+          label: status || 'Unknown'
         };
     }
   };
 
-  const config = getStatusConfig(status);
+  const config = getStatusConfig(status, isActive);
   const sizeClasses = size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1 text-sm';
 
   return (

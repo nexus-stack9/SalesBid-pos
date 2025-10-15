@@ -105,8 +105,8 @@ const VendorManagementDashboard = () => {
   const statusCounts = useMemo(() => {
     return {
       pending: vendors?.filter(v => v?.approval_status === 'pending')?.length,
-      approved: vendors?.filter(v => v?.stapproval_statusatus === 'approved')?.length,
-      rejected: vendors?.filter(v => v?.stapproval_statusatus === 'rejected')?.length
+      approved: vendors?.filter(v => v?.approval_status === 'approved')?.length,
+      rejected: vendors?.filter(v => v?.approval_status === 'rejected')?.length
     };
   }, [vendors]);
 
