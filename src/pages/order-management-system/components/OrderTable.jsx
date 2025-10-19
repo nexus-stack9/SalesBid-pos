@@ -1,3 +1,4 @@
+// components/OrderTable.jsx
 import React, { useState } from 'react';
 import Button from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/ui/Checkbox';
@@ -30,7 +31,7 @@ const OrderTable = ({
   ];
 
   const formatDate = (date) => {
-    return new Date(date)?.toLocaleDateString('en-US', {
+    return new Date(date)?.toLocaleDateString('en-IN', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -38,9 +39,10 @@ const OrderTable = ({
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'INR',
+      minimumFractionDigits: 2
     })?.format(amount);
   };
 
@@ -72,16 +74,20 @@ const OrderTable = ({
         const order = orders?.find(o => o?.id === orderId);
         onViewDetails(order);
         break;
-      case 'edit': console.log('Edit order:', orderId);
+      case 'edit':
+        console.log('Edit order:', orderId);
         break;
-      case 'duplicate': console.log('Duplicate order:', orderId);
+      case 'duplicate':
+        console.log('Duplicate order:', orderId);
         break;
-      case 'archive': console.log('Archive order:', orderId);
+      case 'archive':
+        console.log('Archive order:', orderId);
         break;
       case 'delete':
         console.log('Delete order:', orderId);
         break;
-      case 'print': console.log('Print order:', orderId);
+      case 'print':
+        console.log('Print order:', orderId);
         break;
       case 'export':
         console.log('Export order:', orderId);

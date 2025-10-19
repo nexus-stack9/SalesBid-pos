@@ -1,3 +1,4 @@
+// components/OrderDetailsModal.jsx
 import React from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
@@ -9,13 +10,21 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
   if (!isOpen || !order) return null;
 
   const formatDate = (date) => {
-    return new Date(date)?.toLocaleDateString('en-US', {
+    return new Date(date)?.toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2
+    })?.format(amount);
   };
 
   return (
@@ -118,8 +127,8 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
                         <p className="text-xs text-muted-foreground">Qty: {item?.quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-foreground">${item?.price?.toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">${(item?.price * item?.quantity)?.toFixed(2)}</p>
+                        <p className="text-sm font-medium text-foreground">{formatCurrency(item?.price)}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(item?.price * item?.quantity)}</p>
                       </div>
                     </div>
                   ))}
@@ -132,26 +141,30 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal:</span>
-                    <span className="text-foreground">${order?.subtotal?.toFixed(2)}</span>
+                    <span className="text-foreground">{formatCurrency(order?.subtotal)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping:</span>
-                    <span className="text-foreground">${order?.shipping?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax:</span>
-                    <span className="text-foreground">${order?.tax?.toFixed(2)}</span>
-                  </div>
+                  {order?.shipping > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Shipping:</span>
+                      <span className="text-foreground">{formatCurrency(order?.shipping)}</span>
+                    </div>
+                  )}
+                  {order?.tax > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tax:</span>
+                      <span className="text-foreground">{formatCurrency(order?.tax)}</span>
+                    </div>
+                  )}
                   {order?.discount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Discount:</span>
-                      <span className="text-success">-${order?.discount?.toFixed(2)}</span>
+                      <span className="text-success">-{formatCurrency(order?.discount)}</span>
                     </div>
                   )}
                   <hr className="border-border" />
                   <div className="flex justify-between font-medium">
                     <span className="text-foreground">Total:</span>
-                    <span className="text-foreground">${order?.total?.toFixed(2)}</span>
+                    <span className="text-foreground">{formatCurrency(order?.total)}</span>
                   </div>
                 </div>
               </div>
@@ -193,10 +206,12 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
                       <span className="text-muted-foreground">Carrier:</span>
                       <span className="text-foreground">{order?.carrier}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Estimated Delivery:</span>
-                      <span className="text-foreground">{formatDate(order?.estimatedDelivery)}</span>
-                    </div>
+                    {order?.estimatedDelivery && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Estimated Delivery:</span>
+                        <span className="text-foreground">{formatDate(order?.estimatedDelivery)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -34,13 +34,6 @@ const BulkActionsToolbar = ({
       description: 'Start auctions for selected products immediately'
     },
     {
-      id: 'schedule-auction',
-      label: 'Schedule Auctions',
-      icon: 'Calendar',
-      variant: 'outline',
-      description: 'Schedule auctions for selected products'
-    },
-    {
       id: 'end-auction',
       label: 'End Auctions',
       icon: 'Pause',
@@ -161,7 +154,7 @@ const BulkActionsToolbar = ({
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-primary/20">
+        {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-primary/20">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Active</p>
             <p className="text-lg font-semibold text-success">12</p>
@@ -178,7 +171,7 @@ const BulkActionsToolbar = ({
             <p className="text-sm text-muted-foreground">Total Value</p>
             <p className="text-lg font-semibold text-foreground">₹24,580</p>
           </div>
-        </div>
+        </div> */}
       </div>
       {/* Confirmation Modal */}
       {showConfirmation && confirmationAction && (

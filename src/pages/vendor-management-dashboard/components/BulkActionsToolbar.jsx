@@ -1,134 +1,115 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Button from '../../../components/ui/Button';
-import Icon from '../../../components/AppIcon';
 
-const BulkActionsToolbar = ({ selectedCount, onBulkApprove, onBulkReject, onBulkDelete, onClearSelection }) => {
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
+const BulkActionsToolbar = ({ 
+  selectedCount, 
+  activeTab,
+  onBulkApprove, 
+  onBulkReject,
+  onBulkActivate,
+  onBulkDeactivate,
+  onBulkDelete, 
+  onClearSelection 
+}) => {
+  // Don't show toolbar if no vendors selected
+  if (!selectedCount || selectedCount === 0) return null;
 
-  const handleBulkAction = (action) => {
-    setConfirmAction(action);
-    setShowConfirmDialog(true);
-  };
-
-  const confirmBulkAction = () => {
-    switch (confirmAction?.type) {
-      case 'approve':
-        onBulkApprove();
-        break;
-      case 'reject':
-        onBulkReject();
-        break;
-      case 'delete':
-        onBulkDelete();
-        break;
-    }
-    setShowConfirmDialog(false);
-    setConfirmAction(null);
-  };
-
-  const cancelBulkAction = () => {
-    setShowConfirmDialog(false);
-    setConfirmAction(null);
-  };
-
-  if (selectedCount === 0) return null;
+  console.log('BulkActionsToolbar:', { selectedCount, activeTab });
 
   return (
-    <>
-      <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Icon name="CheckSquare" size={20} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">
-              {selectedCount} vendor{selectedCount !== 1 ? 's' : ''} selected
-            </span>
+    <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Selection Info */}
+        <div className="flex items-center space-x-3">
+          <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-semibold">
+            {selectedCount}
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="success"
-              size="sm"
-              onClick={() => handleBulkAction({ type: 'approve', label: 'approve' })}
-              iconName="Check"
-            >
-              Approve All
-            </Button>
+          <div>
+            <p className="font-medium text-foreground">
+              {selectedCount} vendor{selectedCount !== 1 ? 's' : ''} selected
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Choose a bulk action to apply to selected vendors
+            </p>
+          </div>
+        </div>
+
+        {/* Bulk Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* PENDING TAB - Approve & Reject */}
+          {activeTab === 'pending' && (
+            <>
+              <Button
+                variant="success"
+                size="sm"
+                onClick={onBulkApprove}
+                iconName="Check"
+                iconPosition="left"
+              >
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onBulkReject}
+                iconName="X"
+                iconPosition="left"
+              >
+                Reject
+              </Button>
+            </>
+          )}
+
+          {/* APPROVED TAB - Activate & Deactivate */}
+          {activeTab === 'approved' && (
+            <>
+              <Button
+                variant="success"
+                size="sm"
+                onClick={onBulkActivate}
+                iconName="Play"
+                iconPosition="left"
+              >
+                Activate
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onBulkDeactivate}
+                iconName="Pause"
+                iconPosition="left"
+              >
+                Deactivate
+              </Button>
+            </>
+          )}
+
+          {/* REJECTED TAB - Delete Only */}
+          {activeTab === 'rejected' && (
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => handleBulkAction({ type: 'reject', label: 'reject' })}
-              iconName="X"
-            >
-              Reject All
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleBulkAction({ type: 'delete', label: 'delete' })}
+              onClick={onBulkDelete}
               iconName="Trash2"
+              iconPosition="left"
             >
               Delete
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClearSelection}
-              iconName="X"
-            >
-              Clear
-            </Button>
-          </div>
+          )}
+
+          {/* Clear Selection - Available on all tabs */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearSelection}
+            iconName="X"
+            iconPosition="left"
+          >
+            Clear
+          </Button>
         </div>
       </div>
-
-      {/* Confirmation Dialog */}
-      {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                confirmAction?.type === 'delete' ? 'bg-error/10' : 'bg-warning/10'
-              }`}>
-                <Icon 
-                  name={confirmAction?.type === 'delete' ? 'AlertTriangle' : 'AlertCircle'} 
-                  size={20} 
-                  className={confirmAction?.type === 'delete' ? 'text-error' : 'text-warning'}
-                />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  Confirm Bulk Action
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  This action cannot be undone
-                </p>
-              </div>
-            </div>
-            
-            <p className="text-sm text-foreground mb-6">
-              Are you sure you want to {confirmAction?.label} {selectedCount} selected vendor{selectedCount !== 1 ? 's' : ''}?
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="outline"
-                onClick={cancelBulkAction}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={confirmAction?.type === 'delete' ? 'destructive' : 'default'}
-                onClick={confirmBulkAction}
-              >
-                {confirmAction?.type === 'approve' ? 'Approve' : 
-                 confirmAction?.type === 'reject' ? 'Reject' : 'Delete'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 };
 

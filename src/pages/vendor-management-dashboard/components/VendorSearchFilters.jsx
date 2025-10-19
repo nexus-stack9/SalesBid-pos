@@ -60,7 +60,7 @@ const VendorSearchFilters = ({
           </div>
         </div>
         
-        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
+        {/* <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
           <span className="text-sm text-muted-foreground">
             {resultsCount} vendor{resultsCount !== 1 ? 's' : ''} found
           </span>
@@ -74,7 +74,7 @@ const VendorSearchFilters = ({
           >
             {showAdvancedFilters ? 'Hide Filters' : 'Show Filters'}
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* Quick Filters */}
@@ -96,7 +96,7 @@ const VendorSearchFilters = ({
           </select>
         </div>
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-foreground mb-2">
             Registration Date
           </label>
@@ -111,7 +111,7 @@ const VendorSearchFilters = ({
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         <div className="flex items-end">
           {hasActiveFilters && (

@@ -210,7 +210,7 @@ const DocumentViewer = ({ document, isOpen, onClose, onApprove, onReject, onRequ
                 <Button
                   variant="destructive"
                   fullWidth
-                  onClick={() => handleAction('reject')}
+                  onClick={() => handleAction('rejected')}
                 >
                   <Icon name="X" size={16} />
                   Reject Document
@@ -222,7 +222,7 @@ const DocumentViewer = ({ document, isOpen, onClose, onApprove, onReject, onRequ
             {showCommentForm && (
               <div className="p-4 border-t border-border">
                 <h4 className="font-medium text-foreground mb-3">
-                  Add Comment ({actionType === 'approve' ? 'Approval' : actionType === 'reject' ? 'Rejection' : 'Resubmission'})
+                  Add Comment ({actionType === 'approved' ? 'Approval' : actionType === 'rejected' ? 'Rejection' : 'Resubmission'})
                 </h4>
                 <textarea
                   value={comment}
