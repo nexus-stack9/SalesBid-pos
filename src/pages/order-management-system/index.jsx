@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+// OrderManagementSystem.jsx
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from '../../components/ui/Header';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import Button from '../../components/ui/Button';
@@ -8,301 +9,26 @@ import OrderFilters from './components/OrderFilters';
 import BulkActionsToolbar from './components/BulkActionsToolbar';
 import OrderTable from './components/OrderTable';
 import OrderDetailsModal from './components/OrderDetailsModal';
+import { 
+  getAllOrderMatrixByVendorId, 
+  getAllOrderByVendorId,
+  updateOrderStatus,
+  bulkUpdateOrderStatus,
+  exportOrders
+} from '../../services/orderService';
 
 const OrderManagementSystem = () => {
-  // Mock data for orders
-  const mockOrders = [
-    {
-      id: "ORD-2025-001",
-      customer: {
-        name: "Sarah Johnson",
-        email: "sarah.johnson@email.com",
-        phone: "+1 (555) 123-4567"
-      },
-      items: [
-        {
-          name: "Wireless Bluetooth Headphones",
-          image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
-          vendor: "Tech Solutions Inc",
-          quantity: 1,
-          price: 89.99
-        },
-        {
-          name: "Phone Case",
-          image: "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=400",
-          vendor: "Tech Solutions Inc",
-          quantity: 2,
-          price: 24.99
-        }
-      ],
-      subtotal: 139.97,
-      shipping: 9.99,
-      tax: 11.20,
-      discount: 0,
-      total: 161.16,
-      status: "processing",
-      date: new Date('2025-01-10'),
-      paymentMethod: "Credit Card",
-      paymentStatus: "paid",
-      transactionId: "TXN-789012345",
-      trackingNumber: "1Z999AA1234567890",
-      carrier: "UPS",
-      estimatedDelivery: new Date('2025-01-15'),
-      shippingAddress: {
-        street: "123 Main Street, Apt 4B",
-        city: "New York",
-        state: "NY",
-        zip: "10001",
-        country: "United States"
-      },
-      timeline: [
-        {
-          action: "Order placed",
-          timestamp: new Date('2025-01-10T10:30:00'),
-          note: "Payment confirmed"
-        },
-        {
-          action: "Order confirmed",
-          timestamp: new Date('2025-01-10T11:15:00'),
-          note: "Inventory allocated"
-        },
-        {
-          action: "Processing started",
-          timestamp: new Date('2025-01-11T09:00:00'),
-          note: "Items being prepared for shipment"
-        }
-      ]
-    },
-    {
-      id: "ORD-2025-002",
-      customer: {
-        name: "Michael Chen",
-        email: "michael.chen@email.com",
-        phone: "+1 (555) 234-5678"
-      },
-      items: [
-        {
-          name: "Running Shoes",
-          image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400",
-          vendor: "Sports Gear Pro",
-          quantity: 1,
-          price: 129.99
-        }
-      ],
-      subtotal: 129.99,
-      shipping: 0,
-      tax: 10.40,
-      discount: 15.00,
-      total: 125.39,
-      status: "delivered",
-      date: new Date('2025-01-08'),
-      paymentMethod: "PayPal",
-      paymentStatus: "paid",
-      transactionId: "TXN-456789012",
-      trackingNumber: "1Z999BB9876543210",
-      carrier: "FedEx",
-      estimatedDelivery: new Date('2025-01-12'),
-      shippingAddress: {
-        street: "456 Oak Avenue",
-        city: "Los Angeles",
-        state: "CA",
-        zip: "90210",
-        country: "United States"
-      },
-      timeline: [
-        {
-          action: "Order placed",
-          timestamp: new Date('2025-01-08T14:20:00'),
-          note: "Express shipping selected"
-        },
-        {
-          action: "Order confirmed",
-          timestamp: new Date('2025-01-08T14:45:00')
-        },
-        {
-          action: "Shipped",
-          timestamp: new Date('2025-01-09T08:30:00'),
-          note: "Package dispatched via FedEx"
-        },
-        {
-          action: "Delivered",
-          timestamp: new Date('2025-01-11T16:45:00'),
-          note: "Delivered to front door"
-        }
-      ]
-    },
-    {
-      id: "ORD-2025-003",
-      customer: {
-        name: "Emily Rodriguez",
-        email: "emily.rodriguez@email.com",
-        phone: "+1 (555) 345-6789"
-      },
-      items: [
-        {
-          name: "Organic Face Cream",
-          image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400",
-          vendor: "Beauty World",
-          quantity: 3,
-          price: 45.00
-        },
-        {
-          name: "Vitamin C Serum",
-          image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400",
-          vendor: "Beauty World",
-          quantity: 1,
-          price: 32.99
-        }
-      ],
-      subtotal: 167.99,
-      shipping: 5.99,
-      tax: 13.44,
-      discount: 20.00,
-      total: 167.42,
-      status: "pending",
-      date: new Date('2025-01-12'),
-      paymentMethod: "Credit Card",
-      paymentStatus: "pending",
-      transactionId: "TXN-123456789",
-      shippingAddress: {
-        street: "789 Pine Street",
-        city: "Chicago",
-        state: "IL",
-        zip: "60601",
-        country: "United States"
-      },
-      timeline: [
-        {
-          action: "Order placed",
-          timestamp: new Date('2025-01-12T09:15:00'),
-          note: "Awaiting payment confirmation"
-        }
-      ]
-    },
-    {
-      id: "ORD-2025-004",
-      customer: {
-        name: "David Thompson",
-        email: "david.thompson@email.com",
-        phone: "+1 (555) 456-7890"
-      },
-      items: [
-        {
-          name: "Coffee Maker",
-          image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400",
-          vendor: "Home Essentials",
-          quantity: 1,
-          price: 199.99
-        },
-        {
-          name: "Coffee Beans",
-          image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400",
-          vendor: "Home Essentials",
-          quantity: 2,
-          price: 18.99
-        }
-      ],
-      subtotal: 237.97,
-      shipping: 12.99,
-      tax: 19.04,
-      discount: 0,
-      total: 270.00,
-      status: "shipped",
-      date: new Date('2025-01-09'),
-      paymentMethod: "Debit Card",
-      paymentStatus: "paid",
-      transactionId: "TXN-987654321",
-      trackingNumber: "1Z999CC1122334455",
-      carrier: "USPS",
-      estimatedDelivery: new Date('2025-01-14'),
-      shippingAddress: {
-        street: "321 Elm Drive",
-        city: "Houston",
-        state: "TX",
-        zip: "77001",
-        country: "United States"
-      },
-      timeline: [
-        {
-          action: "Order placed",
-          timestamp: new Date('2025-01-09T11:30:00')
-        },
-        {
-          action: "Order confirmed",
-          timestamp: new Date('2025-01-09T12:00:00')
-        },
-        {
-          action: "Processing started",
-          timestamp: new Date('2025-01-10T08:00:00')
-        },
-        {
-          action: "Shipped",
-          timestamp: new Date('2025-01-11T14:30:00'),
-          note: "Package shipped via USPS Priority Mail"
-        }
-      ]
-    },
-    {
-      id: "ORD-2025-005",
-      customer: {
-        name: "Lisa Wang",
-        email: "lisa.wang@email.com",
-        phone: "+1 (555) 567-8901"
-      },
-      items: [
-        {
-          name: "Summer Dress",
-          image: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400",
-          vendor: "Fashion Hub",
-          quantity: 2,
-          price: 79.99
-        }
-      ],
-      subtotal: 159.98,
-      shipping: 7.99,
-      tax: 12.80,
-      discount: 25.00,
-      total: 155.77,
-      status: "cancelled",
-      date: new Date('2025-01-11'),
-      paymentMethod: "Credit Card",
-      paymentStatus: "refunded",
-      transactionId: "TXN-555666777",
-      shippingAddress: {
-        street: "654 Maple Lane",
-        city: "Seattle",
-        state: "WA",
-        zip: "98101",
-        country: "United States"
-      },
-      timeline: [
-        {
-          action: "Order placed",
-          timestamp: new Date('2025-01-11T13:45:00')
-        },
-        {
-          action: "Order confirmed",
-          timestamp: new Date('2025-01-11T14:00:00')
-        },
-        {
-          action: "Order cancelled",
-          timestamp: new Date('2025-01-11T16:30:00'),
-          note: "Cancelled by customer - item out of stock"
-        },
-        {
-          action: "Refund processed",
-          timestamp: new Date('2025-01-11T17:00:00'),
-          note: "Full refund issued to original payment method"
-        }
-      ]
-    }
-  ];
+  // Get vendorId from auth context or props
+  const vendorId = localStorage.getItem('vendorId') || 1; // Replace with actual auth
 
-  const [orders] = useState(mockOrders);
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState(null);
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'order_date', direction: 'desc' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
@@ -312,14 +38,191 @@ const OrderManagementSystem = () => {
     maxValue: ''
   });
 
-  // Mock stats
-  const stats = {
-    total: 1247,
-    pending: 24,
-    processing: 18,
-    delivered: 156,
-    revenue: 89750,
-    avgOrderValue: 187.50
+  // Fetch orders and stats on mount
+  useEffect(() => {
+    fetchOrdersAndStats();
+  }, [vendorId]);
+
+  const fetchOrdersAndStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [ordersResponse, statsResponse] = await Promise.all([
+        getAllOrderByVendorId(vendorId),
+        getAllOrderMatrixByVendorId(vendorId)
+      ]);
+
+      // Transform orders data to match component structure
+      const transformedOrders = transformOrdersData(ordersResponse);
+      setOrders(transformedOrders);
+
+      // Transform stats data
+      const transformedStats = transformStatsData(statsResponse);
+      setStats(transformedStats);
+
+    } catch (err) {
+      setError(err.message || 'Failed to fetch orders');
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const transformOrdersData = (apiOrders) => {
+    if (!Array.isArray(apiOrders)) return [];
+
+    return apiOrders.map(order => ({
+      id: order.order_id?.toString(),
+      orderId: order.order_id,
+      customer: {
+        name: order.buyer_name || 'N/A',
+        email: order.buyer_email || 'N/A',
+        phone: order.buyer_phone || 'N/A'
+      },
+      product: {
+        id: order.product_id,
+        name: order.product_name || order.name || 'N/A',
+        image: order.image_path || 'https://via.placeholder.com/400',
+        quantity: order.quantity || 1
+      },
+      items: order.bids ? JSON.parse(order.bids).map(bid => ({
+        name: order.product_name || order.name,
+        image: order.image_path || 'https://via.placeholder.com/400',
+        vendor: order.seller || order.seller_name || 'N/A',
+        quantity: 1,
+        price: order.amount || 0
+      })) : [{
+        name: order.product_name || order.name || 'Product',
+        image: order.image_path || 'https://via.placeholder.com/400',
+        vendor: order.seller || order.seller_name || 'N/A',
+        quantity: order.quantity || 1,
+        price: order.amount || 0
+      }],
+      subtotal: order.amount || 0,
+      shipping: 0,
+      tax: 0,
+      discount: 0,
+      total: order.amount || 0,
+      status: mapOrderStatus(order.order_status),
+      date: new Date(order.order_date),
+      paymentMethod: order.payment_method || 'N/A',
+      paymentStatus: order.payment_status || 'pending',
+      transactionId: order.transaction_id || 'N/A',
+      trackingNumber: order.tracking_number || null,
+      carrier: order.carrier || null,
+      estimatedDelivery: order.estimated_delivery ? new Date(order.estimated_delivery) : null,
+      shippingAddress: {
+        street: order.shipping_address || 'N/A',
+        city: order.city || 'N/A',
+        state: order.state || 'N/A',
+        zip: order.pincode || order.seller_pincode || 'N/A',
+        country: 'India'
+      },
+      timeline: generateTimeline(order),
+      // Additional fields from database
+      productId: order.product_id,
+      buyerId: order.buyer_id,
+      sellerId: order.seller_id,
+      winningBidId: order.winning_bid_id,
+      category: order.category,
+      seller: order.seller || order.seller_name
+    }));
+  };
+
+  const mapOrderStatus = (dbStatus) => {
+    const statusMap = {
+      'pending': 'pending',
+      'confirmed': 'confirmed',
+      'processing': 'processing',
+      'shipped': 'shipped',
+      'completed': 'delivered',
+      'cancelled': 'cancelled',
+      'refunded': 'refunded'
+    };
+    return statusMap[dbStatus?.toLowerCase()] || 'pending';
+  };
+
+  const generateTimeline = (order) => {
+    const timeline = [];
+    const orderDate = new Date(order.order_date);
+
+    timeline.push({
+      action: 'Order placed',
+      timestamp: orderDate,
+      note: 'Order created successfully'
+    });
+
+    if (order.order_status === 'confirmed' || order.order_status === 'processing' || 
+        order.order_status === 'shipped' || order.order_status === 'completed') {
+      timeline.push({
+        action: 'Order confirmed',
+        timestamp: new Date(orderDate.getTime() + 30 * 60000), // 30 mins after
+        note: 'Payment confirmed'
+      });
+    }
+
+    if (order.order_status === 'processing' || order.order_status === 'shipped' || 
+        order.order_status === 'completed') {
+      timeline.push({
+        action: 'Processing started',
+        timestamp: new Date(orderDate.getTime() + 60 * 60000), // 1 hour after
+        note: 'Order is being prepared'
+      });
+    }
+
+    if (order.order_status === 'shipped' || order.order_status === 'completed') {
+      timeline.push({
+        action: 'Shipped',
+        timestamp: new Date(orderDate.getTime() + 24 * 60 * 60000), // 1 day after
+        note: order.tracking_number ? `Tracking: ${order.tracking_number}` : 'Package dispatched'
+      });
+    }
+
+    if (order.order_status === 'completed') {
+      timeline.push({
+        action: 'Delivered',
+        timestamp: new Date(orderDate.getTime() + 3 * 24 * 60 * 60000), // 3 days after
+        note: 'Order delivered successfully'
+      });
+    }
+
+    if (order.order_status === 'cancelled') {
+      timeline.push({
+        action: 'Order cancelled',
+        timestamp: new Date(),
+        note: order.cancel_reason || 'Order was cancelled'
+      });
+    }
+
+    return timeline;
+  };
+
+  const transformStatsData = (apiStats) => {
+    if (!apiStats || !Array.isArray(apiStats) || apiStats.length === 0) {
+      return {
+        total: 0,
+        pending: 0,
+        processing: 0,
+        delivered: 0,
+        revenue: 0,
+        avgOrderValue: 0
+      };
+    }
+
+    const statsData = apiStats[0];
+    return {
+      total: parseInt(statsData.total_orders) || 0,
+      pending: parseInt(statsData.pending_orders) || 0,
+      processing: parseInt(statsData.processing_orders) || 0,
+      shipped: parseInt(statsData.shipped_orders) || 0,
+      delivered: parseInt(statsData.completed_orders) || 0,
+      cancelled: parseInt(statsData.cancelled_orders) || 0,
+      revenue: parseFloat(statsData.total_order_value) || 0,
+      avgOrderValue: parseFloat(statsData.avg_order_value) || 0,
+      minOrderValue: parseFloat(statsData.min_order_value) || 0,
+      maxOrderValue: parseFloat(statsData.max_order_value) || 0
+    };
   };
 
   // Filter and sort orders
@@ -332,6 +235,7 @@ const OrderManagementSystem = () => {
           order?.id?.toLowerCase()?.includes(searchTerm) ||
           order?.customer?.name?.toLowerCase()?.includes(searchTerm) ||
           order?.customer?.email?.toLowerCase()?.includes(searchTerm) ||
+          order?.product?.name?.toLowerCase()?.includes(searchTerm) ||
           order?.items?.some(item => item?.name?.toLowerCase()?.includes(searchTerm));
         if (!matchesSearch) return false;
       }
@@ -357,6 +261,34 @@ const OrderManagementSystem = () => {
         return false;
       }
 
+      // Date range filter
+      if (filters?.dateRange !== 'all') {
+        const orderDate = new Date(order?.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        switch (filters?.dateRange) {
+          case 'today':
+            const startOfDay = new Date(today);
+            if (orderDate < startOfDay) return false;
+            break;
+          case 'week':
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            if (orderDate < weekAgo) return false;
+            break;
+          case 'month':
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            if (orderDate < monthAgo) return false;
+            break;
+          case 'quarter':
+            const quarterAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+            if (orderDate < quarterAgo) return false;
+            break;
+          default:
+            break;
+        }
+      }
+
       return true;
     });
 
@@ -379,6 +311,7 @@ const OrderManagementSystem = () => {
             bValue = b?.total;
             break;
           case 'date':
+          case 'order_date':
             aValue = a?.date;
             bValue = b?.date;
             break;
@@ -433,19 +366,95 @@ const OrderManagementSystem = () => {
     setSelectedOrders(isSelected ? filteredAndSortedOrders?.map(order => order?.id) : []);
   };
 
-  const handleStatusUpdate = (orderId, newStatus) => {
-    console.log(`Updating order ${orderId} to status: ${newStatus}`);
-    // In a real app, this would make an API call
+  const handleStatusUpdate = async (orderId, newStatus) => {
+    try {
+      // Map status back to database format
+      const dbStatus = mapStatusToDb(newStatus);
+      
+      await updateOrderStatus(orderId, dbStatus);
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      );
+
+      // Refresh stats
+      const statsResponse = await getAllOrderMatrixByVendorId(vendorId);
+      const transformedStats = transformStatsData(statsResponse);
+      setStats(transformedStats);
+
+      console.log(`Order ${orderId} updated to status: ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Failed to update order status. Please try again.');
+    }
   };
 
-  const handleBulkStatusUpdate = (orderIds, newStatus) => {
-    console.log(`Bulk updating ${orderIds?.length} orders to status: ${newStatus}`);
-    setSelectedOrders([]);
+  const mapStatusToDb = (componentStatus) => {
+    const statusMap = {
+      'pending': 'pending',
+      'confirmed': 'confirmed',
+      'processing': 'processing',
+      'shipped': 'shipped',
+      'delivered': 'completed',
+      'cancelled': 'cancelled',
+      'refunded': 'refunded'
+    };
+    return statusMap[componentStatus] || 'pending';
   };
 
-  const handleBulkExport = (orderIds, format) => {
-    console.log(`Exporting ${orderIds?.length} orders as ${format}`);
-    setSelectedOrders([]);
+  const handleBulkStatusUpdate = async (orderIds, newStatus) => {
+    try {
+      const dbStatus = mapStatusToDb(newStatus);
+      
+      await bulkUpdateOrderStatus(orderIds, dbStatus);
+      
+      // Update local state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          orderIds.includes(order.id) 
+            ? { ...order, status: newStatus }
+            : order
+        )
+      );
+
+      // Refresh stats
+      const statsResponse = await getAllOrderMatrixByVendorId(vendorId);
+      const transformedStats = transformStatsData(statsResponse);
+      setStats(transformedStats);
+
+      setSelectedOrders([]);
+      console.log(`Bulk updated ${orderIds?.length} orders to status: ${newStatus}`);
+    } catch (error) {
+      console.error('Error bulk updating orders:', error);
+      alert('Failed to update orders. Please try again.');
+    }
+  };
+
+  const handleBulkExport = async (orderIds, format) => {
+    try {
+      const blob = await exportOrders(orderIds, format);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orders_export_${Date.now()}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setSelectedOrders([]);
+      console.log(`Exported ${orderIds?.length} orders as ${format}`);
+    } catch (error) {
+      console.error('Error exporting orders:', error);
+      alert('Failed to export orders. Please try again.');
+    }
   };
 
   const handleViewDetails = (order) => {
@@ -457,6 +466,55 @@ const OrderManagementSystem = () => {
     setShowDetailsModal(false);
     setSelectedOrder(null);
   };
+
+  const handleExportAll = async () => {
+    try {
+      const allOrderIds = orders.map(order => order.id);
+      await handleBulkExport(allOrderIds, 'csv');
+    } catch (error) {
+      console.error('Error exporting all orders:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-16">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <Icon name="Loader" size={48} className="animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading orders...</p>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="pt-16">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <Icon name="AlertTriangle" size={48} className="text-error mx-auto mb-4" />
+                <p className="text-foreground font-medium mb-2">Error Loading Orders</p>
+                <p className="text-muted-foreground mb-4">{error}</p>
+                <Button onClick={fetchOrdersAndStats}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -479,21 +537,23 @@ const OrderManagementSystem = () => {
                 variant="outline"
                 iconName="Download"
                 iconPosition="left"
+                onClick={handleExportAll}
               >
                 Export All
               </Button>
               <Button
-                variant="default"
-                iconName="Plus"
+                variant="outline"
+                iconName="RefreshCw"
                 iconPosition="left"
+                onClick={fetchOrdersAndStats}
               >
-                Create Order
+                Refresh
               </Button>
             </div>
           </div>
 
           {/* Stats */}
-          <OrderStats stats={stats} />
+          {stats && <OrderStats stats={stats} />}
 
           {/* Filters */}
           <OrderFilters
@@ -545,6 +605,7 @@ const OrderManagementSystem = () => {
           )}
         </div>
       </main>
+
       {/* Order Details Modal */}
       <OrderDetailsModal
         order={selectedOrder}

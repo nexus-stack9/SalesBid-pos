@@ -129,14 +129,15 @@ const VendorDetailsModal = ({
   const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))];
 
   // Filter products based on search and filters
-  const filteredProducts = products.filter(product => {
+ const filteredProducts = products.filter(product => {
     const matchesSearch = product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           product.product_id?.toString().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus;
+    const matchesVendor = product.vendor_id === vendor?.vendor_id;
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+    return matchesSearch && matchesCategory && matchesStatus && matchesVendor;
+});
 
   const styles = {
     documentItem: {
@@ -308,7 +309,7 @@ const VendorDetailsModal = ({
           <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold text-foreground">{vendor?.business_name}</h2>
-              <VendorStatusBadge status={vendor?.approval_status} isActive={vendor?.isActive} />
+              <VendorStatusBadge status={vendor?.approval_status} isActive={vendor?.isactive} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div>
@@ -393,26 +394,37 @@ const VendorDetailsModal = ({
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Verification Status</span>
                       <span style={styles.infoValue}>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          vendor?.approval_status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {vendor?.approval_status === 'approved' ? 'Verified' : 'Pending Verification'}
-                        </span>
+                        <span
+  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+    vendor?.approval_status === 'approved'
+      ? 'bg-green-100 text-green-800'
+      : vendor?.approval_status === 'rejected'
+      ? 'bg-red-100 text-red-800'
+      : 'bg-yellow-100 text-yellow-800'
+  }`}
+>
+  {vendor?.approval_status === 'approved'
+    ? 'Verified'
+    : vendor?.approval_status === 'rejected'
+    ? 'Rejected'
+    : 'Pending Verification'}
+</span>
+
                       </span>
                     </div>
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Account Status</span>
                       <span style={styles.infoValue}>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          vendor?.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          vendor?.isactive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                         }`}>
-                          {vendor?.isActive ? 'Active' : 'Inactive'}
+                          {vendor?.isactive ? 'Active' : 'Inactive'}
                         </span>
                       </span>
                     </div>
                     <div style={styles.infoRow}>
                       <span style={styles.infoLabel}>Products Listed</span>
-                      <span style={styles.infoValue}>{products?.length || 0}</span>
+                      <span style={styles.infoValue}>{vendor?.total_products || 0}</span>
                     </div>
                     <div style={{...styles.infoRow, borderBottom: 'none'}}>
                       <span style={styles.infoLabel}>Total Documents</span>
@@ -717,7 +729,7 @@ const VendorDetailsModal = ({
                             </div>
                           )}
 
-                          <div className="flex justify-end space-x-2">
+                          {/* <div className="flex justify-end space-x-2">
                             <Button variant="outline" size="sm">
                               <Icon name="Edit" size={14} />
                               Edit Product
@@ -726,7 +738,7 @@ const VendorDetailsModal = ({
                               <Icon name="Trash2" size={14} />
                               Delete
                             </Button>
-                          </div>
+                          </div> */}
                         </div>
                       )}
                     </div>

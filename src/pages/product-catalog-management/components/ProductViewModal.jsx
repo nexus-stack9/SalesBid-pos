@@ -458,7 +458,6 @@ const ProductUploadModal = ({
     if (!formData?.name?.trim()) newErrors.name = 'Product name is required';
     if (!formData?.description?.trim()) newErrors.description = 'Description is required';
     if (!formData?.category_id) newErrors.category_id = 'Category is required';
-    if (!formData?.vendor_id) newErrors.vendor_id = 'Vendor is required';
     if (!formData?.starting_price || parseFloat(formData?.starting_price) <= 0) {
       newErrors.starting_price = 'Valid starting price is required';
     }
@@ -654,7 +653,7 @@ const ProductUploadModal = ({
               )}
             </div>
 
-            <div>
+            {/* <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 Vendor <span className="text-error">*</span>
               </label>
@@ -673,7 +672,7 @@ const ProductUploadModal = ({
               {errors?.vendor_id && (
                 <p className="text-sm text-error mt-1">{errors?.vendor_id}</p>
               )}
-            </div>
+            </div> */}
           </div>
 
           {/* Condition and Shipping */}

@@ -4,63 +4,89 @@ import Image from '../../../components/AppImage';
 import VendorStatusBadge from './VendorStatusBadge';
 import VendorDetailsModal from '../../../components/ui/VendorDetailsModal';
 import JustificationModal from '../../../components/ui/JustificationModal';
-import { updateVendorStatus } from '../../../services/posCrud';
+import { updateVendorActiveStatus } from '../../../services/posCrud';
 import { useNavigate } from 'react-router-dom';
+import { Checkbox } from '../../../components/ui/Checkbox';
 
-const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected, onVendorActiveToggle }) => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [justificationModal, setJustificationModal] = useState({ isOpen: false, action: null });
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
 
-  const handleApprove = () => {
-    setJustificationModal({ isOpen: true, action: 'approve' });
+  const handleApprove = (e) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
+    setJustificationModal({ isOpen: true, action: 'approved' });
   };
 
-  const handleReject = () => {
-    setJustificationModal({ isOpen: true, action: 'reject' });
+  const handleReject = (e) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
+    setJustificationModal({ isOpen: true, action: 'rejected' });
   };
 
   const handleJustificationSubmit = async (data) => {
-    let actionText = "";
-    if(data?.action === 'approve') {
-      actionText = "approved";
-    } else {
-      actionText = "rejected";
-    }
-    console.log('Justification submitted:', data);
-    
+    const { justification, action } = data;
+    if (!action || isProcessing) return;
+
+    setIsProcessing(true);
     try {
-      const response = await updateVendorStatus(vendor?.vendor_id, actionText,data?.justification);
-      console.log('Status update response:', response);
-      onStatusChange(vendor?.vendor_id, data?.action);
+      console.log('🔵 VendorTableRow: Calling parent onStatusChange');
+      await onStatusChange(vendor?.vendor_id, action, justification);
+      console.log('✅ VendorTableRow: Status change completed');
     } catch (error) {
-      console.error('Error updating vendor status:', error);
+      console.error('❌ Error in handleJustificationSubmit:', error);
+      alert('Failed to update vendor status. Please try again.');
+    } finally {
+      setJustificationModal({ isOpen: false, action: null });
+      setTimeout(() => setIsProcessing(false), 1000);
     }
   };
 
-  const handleToggleActive = async (vendorData) => {
-    console.log('Toggling vendor:', vendorData);
-    const newStatus = vendorData?.isActive ? 'inactive' : 'active';
+  const handleToggleActive = async (e, vendorData) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
     
+    const newStatus = !vendorData?.isactive;
+    setIsProcessing(true);
+
     try {
-      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus,data?.justification);
-      console.log('Toggle response:', response);
-      onStatusChange(vendorData?.vendor_id, newStatus);
+      console.log('🔵 Toggling vendor active status:', { 
+        vendorId: vendorData?.vendor_id, 
+        vendorName: vendorData?.business_name,
+        currentStatus: vendorData?.isactive,
+        newStatus 
+      });
+      
+      const response = await updateVendorActiveStatus(vendorData?.vendor_id, newStatus);
+      console.log('✅ API Toggle response:', response);
+      
+      if (onVendorActiveToggle) {
+        console.log('🔄 Calling parent onVendorActiveToggle...');
+        await onVendorActiveToggle(vendorData?.vendor_id, newStatus);
+        console.log('✅ Parent state updated');
+      }
     } catch (error) {
-      console.error('Error toggling vendor status:', error);
+      console.error('❌ Error toggling vendor status:', error);
+      alert('Failed to update vendor status. Please try again.');
+    } finally {
+      setTimeout(() => setIsProcessing(false), 1000);
     }
   };
 
-  const handleViewDetails = () => {
+  const handleViewDetails = (e) => {
+    e?.stopPropagation();
     setShowDetailsModal(true);
   };
 
-  const handleViewDocuments = () => {
-    navigate('/document-verification-center', { state: { vendorId: vendor?.vendor_id } });
+  const handleCheckboxChange = (e) => {
+    e.stopPropagation();
+    onBulkSelect(vendor?.vendor_id, e.target.checked);
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString)?.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -70,17 +96,15 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
 
   return (
     <>
-      {/* Desktop Row */}
       <tr className="border-b border-border hover:bg-muted/50 transition-colors">
-        <td className="p-4">
-          <input
-            type="checkbox"
+        <td className="p-4 align-middle">
+          <Checkbox
             checked={isSelected}
-            onChange={(e) => onBulkSelect(vendor?.vendor_id, e?.target?.checked)}
-            className="rounded border-border"
+            onChange={handleCheckboxChange}
           />
         </td>
-        <td className="p-4">
+
+        <td className="p-4 align-middle">
           <div className="flex items-center space-x-3">
             <Image
               src={vendor?.profile_picture}
@@ -93,37 +117,40 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
             </div>
           </div>
         </td>
-        <td className="p-4">
-          <div className="text-sm">
-            <div className="text-foreground">{vendor?.email}</div>
-            <div className="text-muted-foreground">{vendor?.phone_number}</div>
-          </div>
+
+        <td className="p-4 text-sm align-middle">
+          <div>{vendor?.email}</div>
+          <div className="text-muted-foreground">{vendor?.phone_number}</div>
         </td>
-        <td className="p-4 text-sm text-muted-foreground">
-          {vendor?.items_category}
-        </td>
-        <td className="p-4 text-sm text-muted-foreground">
-          {formatDate(vendor?.created_at)}
-        </td>
-        <td className="p-4">
+
+        <td className="p-4 text-sm text-muted-foreground align-middle">{vendor?.items_category}</td>
+
+        <td className="p-4 text-sm text-muted-foreground align-middle">{formatDate(vendor?.created_at)}</td>
+
+        <td className="p-4 align-middle">
           <div className="flex items-center space-x-2">
             <VendorStatusBadge status={vendor?.approval_status} />
             {vendor?.approval_status === 'approved' && (
-              <VendorStatusBadge status={vendor?.isActive ? 'active' : 'inactive'} size="sm" />
+              <VendorStatusBadge
+                status={vendor?.isactive ? 'active' : 'inactive'}
+                size="sm"
+              />
             )}
           </div>
         </td>
-        <td className="p-4">
+
+        <td className="p-4 align-middle">
           <div className="flex items-center space-x-2">
-            {/* View Details Button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={handleViewDetails}
               iconName="Eye"
               title="View Details"
+              type="button"
+              disabled={isProcessing}
             />
-            
+
             {vendor?.approval_status === 'pending' && (
               <>
                 <Button
@@ -132,8 +159,10 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
                   onClick={handleApprove}
                   iconName="Check"
                   title="Approve Vendor"
+                  type="button"
+                  disabled={isProcessing}
                 >
-                  Approve
+                  {isProcessing ? 'Processing...' : 'Approve'}
                 </Button>
                 <Button
                   variant="destructive"
@@ -141,103 +170,109 @@ const VendorTableRow = ({ vendor, onStatusChange, onBulkSelect, isSelected }) =>
                   onClick={handleReject}
                   iconName="X"
                   title="Reject Vendor"
+                  type="button"
+                  disabled={isProcessing}
                 >
-                  Reject
+                  {isProcessing ? 'Processing...' : 'Reject'}
                 </Button>
               </>
             )}
+
             {vendor?.approval_status === 'approved' && (
               <Button
-                variant={vendor?.isActive ? "outline" : "success"}
+                variant={vendor?.isactive ? 'outline' : 'success'}
                 size="sm"
-                onClick={() => handleToggleActive(vendor)}
-                iconName={vendor?.isActive ? "Pause" : "Play"}
-                title={vendor?.isActive ? 'Deactivate Vendor' : 'Activate Vendor'}
+                onClick={(e) => handleToggleActive(e, vendor)}
+                iconName={vendor?.isactive ? 'Pause' : 'Play'}
+                title={vendor?.isactive ? 'Deactivate Vendor' : 'Activate Vendor'}
+                type="button"
+                disabled={isProcessing}
               >
-                {vendor?.isActive ? 'Deactivate' : 'Activate'}
+                {isProcessing ? 'Processing...' : (vendor?.isactive ? 'Deactivate' : 'Activate')}
               </Button>
             )}
           </div>
         </td>
       </tr>
 
-      {/* Modals */}
       <VendorDetailsModal
         isOpen={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         vendor={vendor}
-        onStatusChange={(vendorId, action) => {
-          if (action === 'approve' || action === 'reject') {
-            setJustificationModal({ isOpen: true, action });
-          } else {
-            onStatusChange(vendorId, action);
-          }
-          setShowDetailsModal(false);
-        }}
       />
-      
+
       <JustificationModal
-        isOpen={justificationModal?.isOpen}
+        isOpen={justificationModal.isOpen}
         onClose={() => setJustificationModal({ isOpen: false, action: null })}
         onSubmit={handleJustificationSubmit}
-        action={justificationModal?.action}
+        action={justificationModal.action}
         vendor={vendor}
       />
     </>
   );
 };
 
-// Mobile Card Component
-export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelected }) => {
+export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelected, onVendorActiveToggle }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [justificationModal, setJustificationModal] = useState({ isOpen: false, action: null });
-  const navigate = useNavigate();
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleApprove = () => {
-    setJustificationModal({ isOpen: true, action: 'approve' });
+  const handleApprove = (e) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
+    setJustificationModal({ isOpen: true, action: 'approved' });
   };
 
-  const handleReject = () => {
-    setJustificationModal({ isOpen: true, action: 'reject' });
+  const handleReject = (e) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
+    setJustificationModal({ isOpen: true, action: 'rejected' });
   };
 
   const handleJustificationSubmit = async (data) => {
-    let actionText = "";
-    if(data?.action === 'approve') {
-      actionText = "approved";
-    } else {
-      actionText = "rejected";
-    }
-    console.log('Justification submitted:', data);
-    
+    const { justification, action } = data;
+    if (!action || isProcessing) return;
+
+    setIsProcessing(true);
     try {
-      const response = await updateVendorStatus(vendor?.vendor_id, actionText,data?.justification);
-      console.log('Status update response:', response);
-      onStatusChange(vendor?.vendor_id, data?.action);
+      await onStatusChange(vendor?.vendor_id, action, justification);
     } catch (error) {
-      console.error('Error updating vendor status:', error);
+      console.error('❌ Error:', error);
+      alert('Failed to update vendor status. Please try again.');
+    } finally {
+      setJustificationModal({ isOpen: false, action: null });
+      setTimeout(() => setIsProcessing(false), 1000);
     }
   };
 
-  const handleToggleActive = async (vendorData) => {
-    console.log('Toggling vendor:', vendorData);
-    const newStatus = vendorData?.isActive ? 'inactive' : 'active';
+  const handleToggleActive = async (e, vendorData) => {
+    e?.stopPropagation();
+    if (isProcessing) return;
     
+    const newStatus = !vendorData?.isactive;
+    setIsProcessing(true);
+
     try {
-      const response = await updateVendorStatus(vendorData?.vendor_id, newStatus,data?.justification);
-      console.log('Toggle response:', response);
-      onStatusChange(vendorData?.vendor_id, newStatus);
+      const response = await updateVendorActiveStatus(vendorData?.vendor_id, newStatus);
+      if (onVendorActiveToggle) {
+        await onVendorActiveToggle(vendorData?.vendor_id, newStatus);
+      }
     } catch (error) {
-      console.error('Error toggling vendor status:', error);
+      console.error('❌ Error:', error);
+      alert('Failed to update vendor status. Please try again.');
+    } finally {
+      setTimeout(() => setIsProcessing(false), 1000);
     }
   };
 
-  const handleViewDetails = () => {
-    setShowDetailsModal(true);
+  const handleCheckboxChange = (e) => {
+    e.stopPropagation();
+    onBulkSelect(vendor?.vendor_id, e.target.checked);
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString)?.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -247,15 +282,10 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
 
   return (
     <>
-      <div className="bg-card border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4 mb-3">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => onBulkSelect(vendor?.vendor_id, e?.target?.checked)}
-              className="rounded border-border"
-            />
+            <Checkbox checked={isSelected} onChange={handleCheckboxChange} />
             <Image
               src={vendor?.profile_picture}
               alt={vendor?.business_name}
@@ -270,7 +300,8 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            iconName={isExpanded ? "ChevronUp" : "ChevronDown"}
+            iconName={isExpanded ? 'ChevronUp' : 'ChevronDown'}
+            type="button"
           />
         </div>
 
@@ -278,12 +309,13 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
           <div className="flex items-center space-x-2">
             <VendorStatusBadge status={vendor?.approval_status} />
             {vendor?.approval_status === 'approved' && (
-              <VendorStatusBadge status={vendor?.isActive ? 'active' : 'inactive'} size="sm" />
+              <VendorStatusBadge
+                status={vendor?.isactive ? 'active' : 'inactive'}
+                size="sm"
+              />
             )}
           </div>
-          <span className="text-sm text-muted-foreground">
-            {formatDate(vendor?.created_at)}
-          </span>
+          <span className="text-sm text-muted-foreground">{formatDate(vendor?.created_at)}</span>
         </div>
 
         {isExpanded && (
@@ -304,17 +336,18 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {/* View Details Button */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleViewDetails}
+                onClick={() => setShowDetailsModal(true)}
                 iconName="Eye"
                 fullWidth
+                type="button"
+                disabled={isProcessing}
               >
                 View Details
               </Button>
-              
+
               {vendor?.approval_status === 'pending' && (
                 <>
                   <Button
@@ -323,8 +356,10 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
                     onClick={handleApprove}
                     iconName="Check"
                     fullWidth
+                    type="button"
+                    disabled={isProcessing}
                   >
-                    Approve
+                    {isProcessing ? 'Processing...' : 'Approve'}
                   </Button>
                   <Button
                     variant="destructive"
@@ -332,20 +367,25 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
                     onClick={handleReject}
                     iconName="X"
                     fullWidth
+                    type="button"
+                    disabled={isProcessing}
                   >
-                    Reject
+                    {isProcessing ? 'Processing...' : 'Reject'}
                   </Button>
                 </>
               )}
+
               {vendor?.approval_status === 'approved' && (
                 <Button
-                  variant={vendor?.isActive ? "outline" : "success"}
+                  variant={vendor?.isactive ? 'outline' : 'success'}
                   size="sm"
-                  onClick={() => handleToggleActive(vendor)}
-                  iconName={vendor?.isActive ? "Pause" : "Play"}
+                  onClick={(e) => handleToggleActive(e, vendor)}
+                  iconName={vendor?.isactive ? 'Pause' : 'Play'}
                   fullWidth
+                  type="button"
+                  disabled={isProcessing}
                 >
-                  {vendor?.isActive ? 'Deactivate' : 'Activate'}
+                  {isProcessing ? 'Processing...' : (vendor?.isactive ? 'Deactivate' : 'Activate')}
                 </Button>
               )}
             </div>
@@ -353,26 +393,17 @@ export const VendorMobileCard = ({ vendor, onStatusChange, onBulkSelect, isSelec
         )}
       </div>
 
-      {/* Modals */}
       <VendorDetailsModal
         isOpen={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         vendor={vendor}
-        onStatusChange={(vendorId, action) => {
-          if (action === 'approve' || action === 'reject') {
-            setJustificationModal({ isOpen: true, action });
-          } else {
-            onStatusChange(vendorId, action);
-          }
-          setShowDetailsModal(false);
-        }}
       />
-      
+
       <JustificationModal
-        isOpen={justificationModal?.isOpen}
+        isOpen={justificationModal.isOpen}
         onClose={() => setJustificationModal({ isOpen: false, action: null })}
         onSubmit={handleJustificationSubmit}
-        action={justificationModal?.action}
+        action={justificationModal.action}
         vendor={vendor}
       />
     </>

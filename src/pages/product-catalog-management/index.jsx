@@ -1,24 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line
+} from 'recharts';
+import {
+  TrendingUp, TrendingDown, Package, IndianRupee, ShoppingCart, Calendar,
+  Filter, Download, Plus, RefreshCw, Eye, Zap, Clock, CheckCircle
+} from 'lucide-react';
 import Header from '../../components/ui/Header';
 import Breadcrumb from '../../components/ui/Breadcrumb';
-import StatsCards from './components/StatsCards';
 import FilterControls from './components/FilterControls';
 import BulkActionsToolbar from './components/BulkActionsToolbar';
 import ProductTable from './components/ProductTable';
 import ProductUploadModal from './components/ProductUploadModal';
 import Button from '../../components/ui/Button';
-import { getAllVendors } from '../../services/posCrud';
 import { getAllProductsByVendorId } from '../../services/posCrud';
-import Cookies from 'js-cookie';
-
-import { insertRecord, uploadMultipleFiles, uploadFile, updatedata, deleteRecord } from '../../services/crudService';
+import { insertRecord, uploadMultipleFiles, updatedata, deleteRecord } from '../../services/crudService';
 
 const ProductCatalogManagement = () => {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,15 +30,7 @@ const ProductCatalogManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const stats = {
-    totalProducts: 156,
-    activeAuctions: 23,
-    scheduledAuctions: 18,
-    totalRevenue: 245680
-  };
-
- const getUserData = () => {
-    // Try to get from cached data
+  const getUserData = () => {
     const cachedUser = localStorage.getItem('user');
     if (cachedUser) {
       try {
@@ -44,65 +39,180 @@ const ProductCatalogManagement = () => {
         console.error('Error parsing cached user data:', error);
       }
     }
-
     return null;
   };
 
- const fetchAllProducts = async () => {
-  setIsLoading(true);
-  setError(null);
-  try {
-    const userData = getUserData();
-    
-    // DEBUG: Check if vendorId exists
-    console.log("userData:", userData);
-    console.log("vendorId:", userData?.vendorId);
-    
-    if (!userData?.vendorId) {
-      setError("Vendor ID not found");
-      setProducts([]);
-      setFilteredProducts([]);
-      setIsLoading(false);
-      return;
-    }
+  // Calculate analytics data
+  const analyticsData = useMemo(() => {
+    // Total stats
+    const totalProducts = products.length;
+    const activeProducts = products.filter(p => p?.isactive).length;
+    const liveAuctions = products.filter(p => p?.auctionstatus === 'live').length;
+    const scheduledAuctions = products.filter(p => p?.auctionstatus === 'scheduled').length;
+    const totalRevenue = products.reduce((sum, p) => sum + (parseFloat(p?.starting_price) || 0), 0);
 
-    const response = await getAllProductsByVendorId(userData.vendorId);
-    
-    // DEBUG: Check response
-    console.log("Full response:", response);
-    console.log("Response data:", response?.data);
-    console.log("Response status:", response?.status);
-    
-    // Handle successful response
-    if (response?.data && Array.isArray(response.data)) {
-      setProducts(response.data);
-      setFilteredProducts(response.data);
-      console.log(`✅ Loaded ${response.data.length} products`);
-    } else {
-      setProducts([]);
-      setFilteredProducts([]);
-      console.log("⚠️ No products found or invalid data format");
+    // Auction status distribution
+    const auctionStatusData = [
+      { name: 'Live', value: liveAuctions, color: '#10b981' },
+      { name: 'Scheduled', value: scheduledAuctions, color: '#f59e0b' },
+      { name: 'Ended', value: products.filter(p => p?.auctionstatus === 'ended').length, color: '#6b7280' },
+      { name: 'Draft', value: products.filter(p => !p?.auctionstatus || p?.auctionstatus === 'draft').length, color: '#94a3b8' }
+    ];
+
+    // Category distribution
+    const categoryCount = {};
+    products.forEach(product => {
+      const category = product?.category || 'Other';
+      categoryCount[category] = (categoryCount[category] || 0) + 1;
+    });
+
+    const categoryData = Object.keys(categoryCount).slice(0, 5).map(category => ({
+      name: category,
+      count: categoryCount[category]
+    }));
+
+    // Price range distribution
+    const priceRanges = [
+      { range: '₹0-1000', min: 0, max: 1000, count: 0 },
+      { range: '₹1000-5000', min: 1000, max: 5000, count: 0 },
+      { range: '₹5000-10000', min: 5000, max: 10000, count: 0 },
+      { range: '₹10000+', min: 10000, max: Infinity, count: 0 }
+    ];
+
+    products.forEach(product => {
+      const price = parseFloat(product?.starting_price) || 0;
+      priceRanges.forEach(range => {
+        if (price >= range.min && price < range.max) {
+          range.count++;
+        }
+      });
+    });
+
+    // Stock status
+    const stockData = [
+      { name: 'In Stock', value: products.filter(p => (p?.quantity || 0) > 10).length, color: '#10b981' },
+      { name: 'Low Stock', value: products.filter(p => {
+        const qty = p?.quantity || 0;
+        return qty > 0 && qty <= 10;
+      }).length, color: '#f59e0b' },
+      { name: 'Out of Stock', value: products.filter(p => (p?.quantity || 0) === 0).length, color: '#ef4444' }
+    ];
+
+    // Recent activity (mock data - replace with real timestamps)
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const activityData = months.map(month => ({
+      month,
+      products: Math.floor(Math.random() * 30) + 10
+    }));
+
+    return {
+      totalProducts,
+      activeProducts,
+      liveAuctions,
+      scheduledAuctions,
+      totalRevenue,
+      auctionStatusData,
+      categoryData,
+      priceRanges,
+      stockData,
+      activityData
+    };
+  }, [products]);
+
+  // Stats for cards
+  const stats = useMemo(() => {
+    return [
+      {
+        title: 'Total Products',
+        value: analyticsData.totalProducts,
+        change: '+12.5%',
+        isPositive: true,
+        icon: Package,
+        iconBg: 'bg-blue-500',
+        iconColor: 'text-blue-500',
+        description: `${analyticsData.activeProducts} active`
+      },
+      {
+        title: 'Live Auctions',
+        value: analyticsData.liveAuctions,
+        change: '+8.2%',
+        isPositive: true,
+        icon: Zap,
+        iconBg: 'bg-green-500',
+        iconColor: 'text-green-500',
+        description: 'Currently running'
+      },
+      {
+        title: 'Scheduled',
+        value: analyticsData.scheduledAuctions,
+        change: '+15.3%',
+        isPositive: true,
+        icon: Clock,
+        iconBg: 'bg-yellow-500',
+        iconColor: 'text-yellow-500',
+        description: 'Upcoming auctions'
+      },
+      {
+        title: 'Total Value',
+        value: `₹${(analyticsData.totalRevenue / 1000).toFixed(1)}K`,
+        change: '+23.1%',
+        isPositive: true,
+        icon: IndianRupee,
+        iconBg: 'bg-purple-500',
+        iconColor: 'text-purple-500',
+        description: 'Inventory value'
+      }
+    ];
+  }, [analyticsData]);
+
+  const fetchAllProducts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const userData = getUserData();
+      
+      console.log("userData:", userData);
+      console.log("vendorId:", userData?.vendorId);
+      
+      if (!userData?.vendorId) {
+        setError("Vendor ID not found");
+        setProducts([]);
+        setFilteredProducts([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await getAllProductsByVendorId(userData.vendorId);
+      
+      console.log("Full response:", response);
+      console.log("Response data:", response?.data);
+      
+      if (response?.data && Array.isArray(response.data)) {
+        setProducts(response.data);
+        setFilteredProducts(response.data);
+        console.log(`✅ Loaded ${response.data.length} products`);
+      } else {
+        setProducts([]);
+        setFilteredProducts([]);
+        console.log("⚠️ No products found or invalid data format");
+      }
+      
+    } catch (err) {
+      console.error("❌ Error details:", err);
+      
+      if (err.response?.status === 204) {
+        console.log("ℹ️ 204: No products available for this vendor");
+        setProducts([]);
+        setFilteredProducts([]);
+      } else {
+        setError(err.response?.data?.error || "Failed to load products");
+        setProducts([]);
+        setFilteredProducts([]);
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-  } catch (err) {
-    console.error("❌ Error details:", err);
-    console.error("Error response:", err.response);
-    console.error("Error status:", err.response?.status);
-    
-    if (err.response?.status === 204) {
-      // No content - this is actually a success case
-      console.log("ℹ️ 204: No products available for this vendor");
-      setProducts([]);
-      setFilteredProducts([]);
-    } else {
-      setError(err.response?.data?.error || "Failed to load products");
-      setProducts([]);
-      setFilteredProducts([]);
-    }
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchAllProducts();
@@ -125,7 +235,7 @@ const ProductCatalogManagement = () => {
 
     if (filters?.auctionStatus) {
       filtered = filtered?.filter(product => 
-        product?.auctionStatus === filters?.auctionStatus
+        product?.auctionstatus === filters?.auctionStatus
       );
     }
 
@@ -156,7 +266,6 @@ const ProductCatalogManagement = () => {
 
       const newStatus = !product.isactive;
       
-      // Update in database
       const result = await updatedata('productForm', productId, {
         is_active: newStatus
       });
@@ -166,7 +275,6 @@ const ProductCatalogManagement = () => {
         return;
       }
 
-      // Update local state
       setProducts(prev => prev?.map(p =>
         p?.product_id === productId
           ? { ...p, isactive: newStatus }
@@ -191,7 +299,6 @@ const ProductCatalogManagement = () => {
 
       const newStatus = product?.auctionstatus === 'live' ? 'scheduled' : 'live';
       
-      // Update in database
       const result = await updatedata('productForm', productId, {
         auction_status: newStatus
       });
@@ -201,7 +308,6 @@ const ProductCatalogManagement = () => {
         return;
       }
 
-      // Update local state
       setProducts(prev => prev?.map(p =>
         p?.product_id === productId
           ? { ...p, auctionstatus: newStatus }
@@ -251,7 +357,6 @@ const ProductCatalogManagement = () => {
     try {
       console.log('Scheduling auction with data:', auctionData);
 
-      // Prepare update data for the product
       const updateData = {
         auction_start: auctionData.startDateTime.toISOString(),
         auction_end: auctionData.endDateTime.toISOString(),
@@ -260,9 +365,6 @@ const ProductCatalogManagement = () => {
         auctionstatus: 'scheduled'
       };
 
-      console.log('Update data:', updateData);
-
-      // Update in database
       const result = await updatedata('productForm', auctionData.productId, updateData);
 
       if (!result.success) {
@@ -271,7 +373,6 @@ const ProductCatalogManagement = () => {
         return;
       }
 
-      // Update local state
       setProducts(prev => prev?.map(product =>
         product?.product_id === auctionData.productId
           ? { 
@@ -305,14 +406,12 @@ const ProductCatalogManagement = () => {
 
   const handleCellValueUpdate = async (productId, field, value) => {
     try {
-      // Prepare update data based on field - map to UI field names
       const updateData = {};
       if (field === 'startDate' || field === 'auction_start') {
         updateData.auction_start = value;
       } else if (field === 'endDate' || field === 'auction_end') {
         updateData.auction_end = value;
       } else {
-        // Map common fields to UI field names
         const fieldMapping = {
           'name': 'product_name',
           'description': 'product_description',
@@ -324,7 +423,6 @@ const ProductCatalogManagement = () => {
         updateData[uiFieldName] = value;
       }
 
-      // Update in database
       const result = await updatedata('productForm', productId, updateData);
 
       if (!result.success) {
@@ -332,7 +430,6 @@ const ProductCatalogManagement = () => {
         return;
       }
 
-      // Update local state
       setProducts(prev => prev?.map(product =>
         product?.product_id === productId
           ? { ...product, ...updateData }
@@ -351,18 +448,13 @@ const ProductCatalogManagement = () => {
   };
 
   const handleBulkAction = async (action) => {
-    console.log(`Performing bulk action: ${action} on products:`, selectedProducts);
-    
-    if (selectedProducts.length === 0) {
-      return;
-    }
+    if (selectedProducts.length === 0) return;
 
     try {
       setIsLoading(true);
       
       switch (action) {
         case 'activate':
-          // Update all selected products to active
           await Promise.all(
             selectedProducts.map(productId =>
               updatedata('productForm', productId, { is_active: true })
@@ -381,7 +473,6 @@ const ProductCatalogManagement = () => {
           break;
           
         case 'deactivate':
-          // Update all selected products to inactive
           await Promise.all(
             selectedProducts.map(productId =>
               updatedata('productForm', productId, { is_active: false })
@@ -400,10 +491,9 @@ const ProductCatalogManagement = () => {
           break;
           
         case 'start-auction':
-          // Start auction for all selected products
           await Promise.all(
             selectedProducts.map(productId =>
-              updatedata('productForm', productId, { auction_status: 'live' })
+              updatedata('productForm', productId, { auctionstatus: 'live' })
             )
           );
           setProducts(prev => prev?.map(product =>
@@ -419,10 +509,9 @@ const ProductCatalogManagement = () => {
           break;
           
         case 'end-auction':
-          // End auction for all selected products
           await Promise.all(
             selectedProducts.map(productId =>
-              updatedata('productForm', productId, { auction_status: 'ended' })
+              updatedata('productForm', productId, { auctionstatus: 'ended' })
             )
           );
           setProducts(prev => prev?.map(product =>
@@ -447,24 +536,14 @@ const ProductCatalogManagement = () => {
             return;
           }
           
-          // Delete all selected products
-          const deleteResults = await Promise.all(
+          await Promise.all(
             selectedProducts.map(productId =>
-              deleteRecord('productForm', productId)
+              updatedata('productForm', productId, { is_active: false })
             )
           );
           
-          const failedDeletes = deleteResults.filter(r => !r.success);
-          if (failedDeletes.length > 0) {
-            console.error('Some deletes failed:', failedDeletes);
-          }
-          
           setProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
           setFilteredProducts(prev => prev?.filter(product => !selectedProducts?.includes(product?.product_id)));
-          
-          const successCount = selectedProducts.length - failedDeletes.length;
-          if (successCount > 0) {
-          }
           break;
       }
       
@@ -481,8 +560,7 @@ const ProductCatalogManagement = () => {
   };
 
   const handleExport = () => {
-    console.log('Exporting selected products:', selectedProducts);
-    // Implement export functionality
+    console.log('Exporting products...');
   };
 
   const handleAddProduct = () => {
@@ -491,14 +569,10 @@ const ProductCatalogManagement = () => {
 
   const handleEditSave = async (productData) => {
     try {
-      console.log('Updating product with data:', productData);
-
-      // Prepare update data using UI field names
       const updateData = {
         product_name: productData.name,
         product_description: productData.description,
         category_id: productData.category_id,
-        vendor_id: productData.vendor_id,
         starting_price: productData.starting_price,
         retail_value: productData.retail_value,
         auction_start: productData.auction_start,
@@ -517,17 +591,20 @@ const ProductCatalogManagement = () => {
         trending: productData.trending,
         is_active: productData.isactive,
         product_status: productData.status,
-        auction_status: productData.auctionstatus
+        auction_status: productData.auctionstatus,
+        created_by: getUserData()?.email,
+        seller_id: getUserData()?.vendorId,
+        auctionstatus: productData.auctionstatus,
+        vendor_email: getUserData()?.email,
+        vendor_id: getUserData()?.vendorId,
       };
 
-      // Update in database
       const result = await updatedata('productForm', editingProduct.product_id, updateData);
       if (!result.success) {
-        console.error('Failed to update product:', result.message);
-        return;
+        alert('Failed to update product. Please try again.');
+        return false;
       }
 
-      // Handle image uploads if any
       if (productData.imageFiles && productData.imageFiles.length > 0) {
         const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
         const vendorId = getUserData()?.vendorId;
@@ -537,43 +614,37 @@ const ProductCatalogManagement = () => {
           const uploadRes = await uploadMultipleFiles(productData.imageFiles, uploadPath);
           
           if (uploadRes.success) {
-            const mainImagePath = `${filePathPrefix}/${uploadPath}/${productData.imageFiles[0].name}`;
-            updateData.image_path = mainImagePath;
+            const allImagePaths = productData.imageFiles.map((file) => {
+              return `${filePathPrefix}/${uploadPath}/${file.name}`;
+            }).join(',');
             
-            // Update with image path
-            await updatedata('productForm', editingProduct.product_id, { image_path: mainImagePath });
+            await updatedata('productForm', editingProduct.product_id, { image_path: allImagePaths });
           }
         } catch (uploadError) {
           console.error('Error during image upload:', uploadError);
         }
       }
 
-      // Update local state
-      setProducts(prev => prev?.map(product =>
-        product?.product_id === editingProduct?.product_id
-          ? { ...product, ...updateData }
-          : product
-      ));
-      setFilteredProducts(prev => prev?.map(product =>
-        product?.product_id === editingProduct?.product_id
-          ? { ...product, ...updateData }
-          : product
-      ));
-
-      console.log('Product updated successfully');
+      await fetchAllProducts();
+      setIsEditModalOpen(false);
+      setEditingProduct(null);
+      alert('Product updated successfully!');
+      
+      return true;
+      
     } catch (error) {
       console.error('Error updating product:', error);
+      alert('Error updating product. Please try again.');
+      return false;
     }
   };
 
   const handleSaveProduct = async (productData) => {
     try {
-      console.log('Saving product with data:', productData);
       const productFormData = {
         name: productData.name,
         description: productData.description,
         category_id: productData.category_id,
-        vendor_id: productData.vendor_id,
         starting_price: productData.starting_price,
         retail_value: productData.retail_value,
         auction_start: productData.auction_start,
@@ -590,108 +661,69 @@ const ProductCatalogManagement = () => {
         length: productData.length,
         breadth: productData.breadth,
         trending: productData.trending,
-        isactive: productData.isactive,
+        isactive: true,
         status: productData.status,
+        created_by: getUserData()?.email,
+        seller_id: getUserData()?.vendorId,
         auctionstatus: productData.auctionstatus,
-        vendorEmail: 'vendor@example.com', // TODO: Get from auth context
+        vendor_email: getUserData()?.email,
+        vendor_id: getUserData()?.vendorId,
         currentBid: null,
-        image_path: '' // Will be updated after upload
+        image_path: ''
       };
       
-      // Step 1: Insert product record into database
-      console.log('Inserting product record:', productFormData);
       const result = await insertRecord('productForm', productFormData);
       
       if (!result.success || !result.id) {
-        console.error('Failed to create product:', result.error);
-        return;
+        alert('Failed to create product. Please try again.');
+        return false;
       }
       
       const productId = result.id;
-      const vendorId = getUserData()?.vendorId; // Using 15 as default based on your fetchAllProducts
-      console.log('Product created with ID:', productId);
+      const vendorId = getUserData()?.vendorId;
       
-      // Step 2: Handle image uploads if any
-      let mainImagePath = '';
+      let allImagePaths = '';
+      
       if (productData.imageFiles && productData.imageFiles.length > 0) {
         const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
         const uploadPath = `${vendorId}/Products/${productId}`;
         
-        console.log('Uploading images to path:', uploadPath);
-        console.log('Number of images to upload:', productData.imageFiles.length);
-        
         try {
-          // Upload all image files
           const uploadRes = await uploadMultipleFiles(productData.imageFiles, uploadPath);
           
           if (uploadRes.success) {
-            console.log('Images uploaded successfully');
-
-            // Create comma-separated string of all image paths
-            const allImagePaths = productData.imageFiles.map((file, index) => {
+            allImagePaths = productData.imageFiles.map((file) => {
               return `${filePathPrefix}/${uploadPath}/${file.name}`;
             }).join(',');
 
-            console.log('All image paths:', allImagePaths);
-
-            // Update product record with all image paths
-            const updateData = {
-              image_path: allImagePaths
-            };
-
-            console.log('Updating product with image paths:', updateData);
-            const updateRes = await updatedata('productForm', productId, updateData);
-
-            if (!updateRes.success) {
-              console.error('Failed to update product with image paths:', updateRes.error);
-            }
-          } else {
-            console.error('Image upload failed:', uploadRes.error);
+            await updatedata('productForm', productId, { image_path: allImagePaths });
           }
         } catch (uploadError) {
           console.error('Error during image upload:', uploadError);
         }
       } 
       
-      // Step 3: Handle video uploads if any
       if (productData.videoFiles && productData.videoFiles.length > 0) {
         const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
         const uploadPath = `${vendorId}/Products/${productId}/videos`;
         
-        console.log('Uploading videos to path:', uploadPath);
-        console.log('Number of videos to upload:', productData.videoFiles.length);
-        
         try {
-          const uploadRes = await uploadMultipleFiles(productData.videoFiles, uploadPath);
-          
-          if (uploadRes.success) {
-            console.log('Videos uploaded successfully');
-          } else {
-            console.error('Video upload failed:', uploadRes.error);
-          }
+          await uploadMultipleFiles(productData.videoFiles, uploadPath);
         } catch (uploadError) {
           console.error('Error during video upload:', uploadError);
         }
       }
       
-      // Step 4: Add to local state for immediate UI update
-      const newProductWithId = {
-        ...productFormData,
-        product_id: productId,
-        id: productId,
-        image_path: allImagePaths || ''
-      };
-      
-      setProducts(prev => [newProductWithId, ...prev]);
-      setFilteredProducts(prev => [newProductWithId, ...prev]);
-      
-      // Step 5: Refresh products list from server
       await fetchAllProducts();
+      setIsUploadModalOpen(false);
+      alert('Product added successfully!');
       
-      console.log('Product saved successfully with ID:', productId);
+      return true;
       
     } catch (error) {
       console.error('Error saving product:', error);
+      alert('Error saving product. Please try again.');
+      return false;
     }
   };
 
@@ -704,56 +736,228 @@ const ProductCatalogManagement = () => {
   const totalPages = Math.ceil(filteredProducts?.length / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
       <Header />
       <main className="pt-16">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Breadcrumb />
           
-          {/* Page Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Product Catalog Management</h1>
-              <p className="text-muted-foreground">
-                Manage product listings, auction controls, and inventory across all vendors
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button
-                variant="outline"
-                iconName="Download"
-                iconPosition="left"
-                onClick={handleExport}
-              >
-                Export All
-              </Button>
-              <Button
-                variant="default"
-                iconName="Plus"
-                iconPosition="left"
-                onClick={handleAddProduct}
-              >
-                Add Product
-              </Button>
+          {/* Enhanced Header Section */}
+          <div className="mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold bg-blue-600 bg-clip-text text-transparent mb-3">
+                  Product Catalog Management
+                </h1>
+                <p className="text-gray-600 text-lg">
+                  Manage product listings, auction controls with powerful analytics
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={fetchAllProducts}
+                  className="px-5 py-2.5 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm font-medium"
+                >
+                  <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 font-medium"
+                >
+                  <Download size={18} />
+                  Export
+                </button>
+                <button
+                  onClick={handleAddProduct}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30 font-medium"
+                >
+                  <Plus size={18} />
+                  Add Product
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Stats Cards */}
-          <StatsCards stats={stats} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {stats.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={index}
+                  className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:scale-105 hover:-translate-y-1"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-xl ${stat.iconBg} bg-opacity-10`}>
+                      <Icon className={stat.iconColor} size={28} />
+                    </div>
+                    <span className={`flex items-center text-sm font-semibold px-2.5 py-1 rounded-full ${stat.isPositive ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`}>
+                      {stat.isPositive ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+                      {stat.change}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium mb-1">{stat.title}</p>
+                    <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
+                    <p className="text-xs text-gray-400">{stat.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Analytics Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Auction Status Distribution */}
+            <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-green-600 to-emerald-600 rounded-full"></div>
+                Auction Status Distribution
+              </h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={analyticsData.auctionStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {analyticsData.auctionStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-wrap justify-center gap-4 mt-4">
+                {analyticsData.auctionStatusData.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-sm font-medium text-gray-600">{item.name}: {item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Category Distribution */}
+            <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
+                Top Categories
+              </h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={analyticsData.categoryData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '12px',
+                      padding: '12px'
+                    }} 
+                  />
+                  <Bar dataKey="count" fill="url(#colorBar)" radius={[10, 10, 0, 0]} />
+                  <defs>
+                    <linearGradient id="colorBar" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="100%" stopColor="#6366f1" />
+                    </linearGradient>
+                  </defs>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Price Range Distribution */}
+            <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-purple-600 to-pink-600 rounded-full"></div>
+                Price Range Distribution
+              </h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={analyticsData.priceRanges}>
+                  <defs>
+                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="range" stroke="#888" />
+                  <YAxis stroke="#888" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '12px'
+                    }} 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#a855f7" 
+                    fillOpacity={1} 
+                    fill="url(#colorPrice)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Stock Status */}
+            <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <div className="w-1.5 h-8 bg-gradient-to-b from-orange-600 to-red-600 rounded-full"></div>
+                Stock Status
+              </h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={analyticsData.stockData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {analyticsData.stockData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-wrap justify-center gap-4 mt-4">
+                {analyticsData.stockData.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-sm font-medium text-gray-600">{item.name}: {item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
           {/* Error Display */}
           {error && (
-            <div className="mb-4 p-4 bg-error/10 border border-error/20 rounded-lg">
-              <p className="text-sm text-error">{error}</p>
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
+              <p className="text-red-600 font-medium">{error}</p>
             </div>
           )}
 
           {/* Filter Controls */}
-          <FilterControls
-            onFilterChange={handleFilterChange}
-            onSearch={handleSearch}
-            onAddProduct={handleAddProduct}
-          />
+          <div className="mb-6">
+            <FilterControls
+              onFilterChange={handleFilterChange}
+              onSearch={handleSearch}
+              onAddProduct={handleAddProduct}
+            />
+          </div>
 
           {/* Bulk Actions Toolbar */}
           <BulkActionsToolbar
@@ -765,35 +969,42 @@ const ProductCatalogManagement = () => {
 
           {/* Loading State */}
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-20 bg-white rounded-2xl shadow-xl">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Loading products...</p>
+                <div className="relative">
+                  <div className="animate-spin rounded-full h-20 w-20 border-4 border-gray-200 border-t-purple-600 mx-auto mb-6"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Package className="text-purple-600" size={32} />
+                  </div>
+                </div>
+                <p className="text-gray-600 font-semibold text-lg">Loading products...</p>
               </div>
             </div>
           ) : (
             <>
               {/* Products Table */}
-              <ProductTable
-                 products={products}
-                 onStatusToggle={handleStatusToggle}
-                 onAuctionToggle={handleAuctionToggle}
-                 onEditProduct={handleEditProduct}
-                 onBulkAction={handleBulkAction}
-                 selectedProducts={selectedProducts}
-                 onSelectProduct={handleSelectProduct}
-                 onSelectAll={handleSelectAll}
-                 onCellValueUpdate={handleCellValueUpdate}
-                 onAuctionSchedule={handleAuctionSchedule}
-              />
+              <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden mb-6">
+                <ProductTable
+                  products={getCurrentPageProducts()}
+                  onStatusToggle={handleStatusToggle}
+                  onAuctionToggle={handleAuctionToggle}
+                  onEditProduct={handleEditProduct}
+                  onBulkAction={handleBulkAction}
+                  selectedProducts={selectedProducts}
+                  onSelectProduct={handleSelectProduct}
+                  onSelectAll={handleSelectAll}
+                  onCellValueUpdate={handleCellValueUpdate}
+                  onAuctionSchedule={handleAuctionSchedule}
+                />
+              </div>
 
-              {/* Pagination */}
+              {/* Enhanced Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProducts?.length)} of {filteredProducts?.length} products
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
+                  <div className="text-sm text-gray-600 font-medium">
+                    Showing <span className="font-bold text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * itemsPerPage, filteredProducts?.length)}</span> of <span className="font-bold text-gray-900">{filteredProducts?.length}</span> products
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -801,10 +1012,11 @@ const ProductCatalogManagement = () => {
                       disabled={currentPage === 1}
                       iconName="ChevronLeft"
                       iconPosition="left"
+                      className="rounded-xl"
                     >
                       Previous
                     </Button>
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-1">
                       {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                         const pageNum = i + 1;
                         return (
@@ -813,6 +1025,7 @@ const ProductCatalogManagement = () => {
                             variant={currentPage === pageNum ? "default" : "outline"}
                             size="sm"
                             onClick={() => setCurrentPage(pageNum)}
+                            className={`rounded-xl min-w-[40px] ${currentPage === pageNum ? 'bg-gradient-to-r from-purple-600 to-pink-600' : ''}`}
                           >
                             {pageNum}
                           </Button>
@@ -826,6 +1039,7 @@ const ProductCatalogManagement = () => {
                       disabled={currentPage === totalPages}
                       iconName="ChevronRight"
                       iconPosition="right"
+                      className="rounded-xl"
                     >
                       Next
                     </Button>
@@ -837,7 +1051,7 @@ const ProductCatalogManagement = () => {
         </div>
       </main>
       
-      {/* Product Upload/Add Modal */}
+      {/* Modals */}
       <ProductUploadModal
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
@@ -845,7 +1059,6 @@ const ProductCatalogManagement = () => {
         isEditMode={false}
       />
 
-      {/* Product Edit Modal */}
       <ProductUploadModal
         isOpen={isEditModalOpen}
         onClose={() => {
@@ -859,4 +1072,5 @@ const ProductCatalogManagement = () => {
     </div>
   );
 };
+
 export default ProductCatalogManagement;

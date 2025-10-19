@@ -247,7 +247,7 @@ const ProductEditModal = ({
             </select>
             {errors.category_id && <p className="text-sm text-error mt-1">{errors.category_id}</p>}
           </div>
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-muted-foreground mb-2">
               Vendor *
             </label>
@@ -262,7 +262,7 @@ const ProductEditModal = ({
               ))}
             </select>
             {errors.vendor_id && <p className="text-sm text-error mt-1">{errors.vendor_id}</p>}
-          </div>
+          </div> */}
         </div>
 
         {/* Auction Dates */}

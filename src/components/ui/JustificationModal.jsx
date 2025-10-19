@@ -178,6 +178,7 @@ const JustificationModal = ({
               iconName={isLoading ? "Loader2" : config?.icon}
               iconPosition="left"
             >
+              Submit
               {isLoading ? 'Processing...' : config?.buttonText}
             </Button>
           </div>

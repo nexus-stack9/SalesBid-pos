@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import { Checkbox } from '../../../components/ui/Checkbox';
 import ImageGalleryModal from '../../../components/ui/ImageGalleryModal';
 import ScheduleAuctionModal from '../../../components/ui/ScheduleAuctionModal';
 import ProductViewModal from '../../../components/ui/ProductViewModal';
@@ -17,7 +18,8 @@ const ProductTable = ({
   onSelectProduct,
   onSelectAll,
   onCellValueUpdate,
-  onAuctionSchedule
+  onAuctionSchedule,
+  currentPageProducts
 }) => {
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -25,27 +27,67 @@ const ProductTable = ({
   const [scheduleModal, setScheduleModal] = useState({ isOpen: false, product: null });
   const [viewModal, setViewModal] = useState({ isOpen: false, product: null });
   const [goLiveModal, setGoLiveModal] = useState({ isOpen: false, product: null });
+  const [imageErrors, setImageErrors] = useState({});
+
+  // Placeholder image for fallback
+  const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect fill="%23f0f0f0" width="100" height="100"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
 
   // Get the first image URL from comma-separated string for main display
   const getMainImageUrl = (product) => {
-    if (!product?.image_path) return null;
+    if (!product?.image_path) {
+      console.log('No image_path found for product:', product?.name);
+      return null;
+    }
 
-    const imageUrls = product.image_path.split(',').map(url => url.trim());
-    return imageUrls[0] || null;
+    // Clean and parse the image path
+    const imagePath = product.image_path.trim();
+    
+    // Handle comma-separated paths
+    if (imagePath.includes(',')) {
+      const imageUrls = imagePath.split(',').map(url => url.trim()).filter(url => url);
+      console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
+      return imageUrls[0] || null;
+    }
+
+    console.log(`Product "${product?.name}" image URL:`, imagePath);
+    return imagePath;
   };
 
   // Parse product images from comma-separated image_path string
   const getProductImages = (product) => {
-    if (!product?.image_path) return [];
+    if (!product?.image_path) {
+      console.log('No image_path found for product:', product?.name);
+      return [];
+    }
 
+    // Clean and parse the image path
+    const imagePath = product.image_path.trim();
+    
     // Split the comma-separated string into individual image URLs
-    const imageUrls = product.image_path.split(',').map(url => url.trim());
+    const imageUrls = imagePath
+      .split(',')
+      .map(url => url.trim())
+      .filter(url => url); // Remove empty strings
+
+    console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
 
     // Return array of image objects for the gallery
     return imageUrls.map((url, index) => ({
       url: url,
       alt: `${product?.name} - Image ${index + 1}`
     }));
+  };
+
+  // Handle image load error
+  const handleImageError = (productId) => {
+    console.error(`Failed to load image for product ID: ${productId}`);
+    setImageErrors(prev => ({ ...prev, [productId]: true }));
+  };
+
+  // Handle image load success
+  const handleImageLoad = (productId) => {
+    console.log(`Successfully loaded image for product ID: ${productId}`);
+    setImageErrors(prev => ({ ...prev, [productId]: false }));
   };
 
   const handleCellEdit = (productId, field, currentValue) => {
@@ -83,6 +125,8 @@ const ProductTable = ({
   };
 
   const handleViewImages = (product) => {
+    const images = getProductImages(product);
+    console.log('Opening gallery with images:', images);
     setImageGalleryModal({ isOpen: true, product });
   };
 
@@ -113,6 +157,7 @@ const ProductTable = ({
   };
 
   const formatDate = (date) => {
+    if (!date) return 'N/A';
     return new Date(date)?.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -133,14 +178,62 @@ const ProductTable = ({
     return (
       <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config?.color}`}>
         <Icon name={config?.icon} size={12} />
-        <span className="capitalize">{status}</span>
+        <span className="capitalize">{status || 'draft'}</span>
       </span>
     );
   };
 
   // Check if product can go live (active and has auction scheduled)
   const canGoLive = (product) => {
-    return product?.isActive && product?.auction_start && product?.auction_end;
+    return product?.isactive && product?.auction_start && product?.auction_end;
+  };
+
+  // Checkbox selection logic - use current page products for select all
+  const isAllSelected = products?.length > 0 &&
+    products?.every(product => selectedProducts?.includes(product?.product_id));
+  const isIndeterminate = products?.length > 0 &&
+    products?.some(product => selectedProducts?.includes(product?.product_id)) &&
+    !isAllSelected;
+
+  // Product Image Component with error handling
+  const ProductImage = ({ product, size = 'small' }) => {
+    const imageUrl = getMainImageUrl(product);
+    const hasError = imageErrors[product?.product_id];
+    
+    const sizeClasses = {
+      small: 'w-12 h-12',
+      medium: 'w-16 h-16'
+    };
+
+    // Debug logging
+    React.useEffect(() => {
+      console.log(`ProductImage render for "${product?.name}":`, {
+        imageUrl,
+        hasError,
+        image_path: product?.image_path
+      });
+    }, [imageUrl, hasError, product]);
+
+    return (
+      <div className={`${sizeClasses[size]} rounded-lg overflow-hidden bg-muted flex-shrink-0`}>
+        {imageUrl && !hasError ? (
+          <img
+            src={imageUrl}
+            alt={product?.name || 'Product'}
+            className="w-full h-full object-cover"
+            onError={() => handleImageError(product?.product_id)}
+            onLoad={() => handleImageLoad(product?.product_id)}
+            loading="lazy"
+          />
+        ) : (
+          <img
+            src={PLACEHOLDER_IMAGE}
+            alt="No image available"
+            className="w-full h-full object-cover"
+          />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -152,11 +245,10 @@ const ProductTable = ({
             <thead className="bg-muted">
               <tr>
                 <th className="w-12 p-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts?.length === products?.length}
+                  <Checkbox
+                    checked={isAllSelected}
+                    indeterminate={isIndeterminate}
                     onChange={(e) => onSelectAll(e?.target?.checked)}
-                    className="rounded border-border"
                   />
                 </th>
                 <th className="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
@@ -171,28 +263,28 @@ const ProductTable = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {products?.map((product) => (
-                <tr key={product?.product_id} className="hover:bg-muted/50">
+              {products?.map((product, index) => (
+                <tr key={`${product?.product_id}-${index}`} className="hover:bg-muted/50">
                   <td className="p-4">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedProducts?.includes(product?.product_id)}
-                      onChange={(e) => onSelectProduct(product?.product_id, e?.target?.checked)}
-                      className="rounded border-border"
+                      onChange={(e) => {
+                        console.log('Product checkbox changed:', {
+                          productId: product?.product_id,
+                          productName: product?.name,
+                          checked: e.target.checked,
+                          isSelected: selectedProducts?.includes(product?.product_id)
+                        });
+                        onSelectProduct(product?.product_id, e?.target?.checked);
+                      }}
                     />
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        <Image
-                          src={getMainImageUrl(product)}
-                          alt={product?.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <ProductImage product={product} size="small" />
                       <div>
                         <p className="font-medium text-foreground">{product?.name}</p>
-                        {/* <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p> */}
+                        <p className="text-sm text-muted-foreground">ID: {product?.product_id}</p>
                       </div>
                     </div>
                   </td>
@@ -209,16 +301,16 @@ const ProductTable = ({
                   </td>
                   <td className="p-4">
                     <div>
-                      <p className="font-medium text-foreground">{product?.seller}</p>
-                      <p className="text-sm text-muted-foreground">{product?.sellerEmail}</p>
+                      <p className="font-medium text-foreground">{product?.seller || 'N/A'}</p>
+                      <p className="text-sm text-muted-foreground">{product?.sellerEmail || 'N/A'}</p>
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm text-foreground">{product?.category}</span>
+                    <span className="text-sm text-foreground">{product?.category || 'N/A'}</span>
                   </td>
                   <td className="p-4">
                     <div>
-                      <p className="font-medium text-foreground">₹{product?.starting_price}</p>
+                      <p className="font-medium text-foreground">₹{product?.starting_price || 0}</p>
                       {product?.bid_amount && (
                         <p className="text-sm text-success">Current: ₹{product?.bid_amount}</p>
                       )}
@@ -226,7 +318,7 @@ const ProductTable = ({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      {/* {getAuctionStatusBadge(product?.auctionStatus)} */}
+                      {getAuctionStatusBadge(product?.auctionstatus)}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -366,37 +458,37 @@ const ProductTable = ({
         
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-4 p-4">
-          {products?.map((product) => (
-            <div key={product?.product_id} className="bg-card border border-border rounded-lg p-4">
+          {products?.map((product, index) => (
+            <div key={`${product?.product_id}-${index}`} className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-start space-x-3 mb-3">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selectedProducts?.includes(product?.product_id)}
-                  onChange={(e) => onSelectProduct(product?.product_id, e?.target?.checked)}
-                  className="mt-1 rounded border-border"
+                  onChange={(e) => {
+                    console.log('Product mobile checkbox changed:', {
+                      productId: product?.product_id,
+                      productName: product?.name,
+                      checked: e.target.checked,
+                      isSelected: selectedProducts?.includes(product?.product_id)
+                    });
+                    onSelectProduct(product?.product_id, e?.target?.checked);
+                  }}
                 />
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                  <Image
-                    src={getMainImageUrl(product)}
-                    alt={product?.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <ProductImage product={product} size="medium" />
                 <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
-                  {/* <p className="text-sm text-muted-foreground">SKU: {product?.sku}</p> */}
-                  <p className="text-sm text-muted-foreground">{product?.seller}</p>
+                  <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
+                  <p className="text-sm text-muted-foreground">ID: {product?.product_id}</p>
+                  <p className="text-sm text-muted-foreground">{product?.seller || 'N/A'}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Category</p>
-                  <p className="text-sm font-medium">{product?.category}</p>
+                  <p className="text-sm font-medium">{product?.category || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Starting Price</p>
-                  <p className="text-sm font-medium">₹{product?.starting_price}</p>
+                  <p className="text-sm font-medium">₹{product?.starting_price || 0}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Images</p>
@@ -426,7 +518,7 @@ const ProductTable = ({
 
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
-                  {/* {getAuctionStatusBadge(product?.auctionStatus)} */}
+                  {getAuctionStatusBadge(product?.auctionstatus)}
                 </div>
                 <button
                   onClick={() => onStatusToggle(product?.product_id)}
@@ -490,7 +582,7 @@ const ProductTable = ({
         isOpen={imageGalleryModal?.isOpen}
         onClose={() => setImageGalleryModal({ isOpen: false, product: null })}
         images={imageGalleryModal?.product ? getProductImages(imageGalleryModal?.product) : []}
-        title={`${imageGalleryModal?.product?.name} - Images`}
+        title={`${imageGalleryModal?.product?.name || 'Product'} - Images`}
       />
 
       {/* Schedule Auction Modal */}

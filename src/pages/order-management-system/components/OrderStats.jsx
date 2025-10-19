@@ -1,11 +1,21 @@
+// components/OrderStats.jsx
 import React from 'react';
 import Icon from '../../../components/AppIcon';
 
 const OrderStats = ({ stats }) => {
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    })?.format(amount);
+  };
+
   const statCards = [
     {
       title: 'Total Orders',
-      value: stats?.total?.toLocaleString(),
+      value: stats?.total?.toLocaleString('en-IN'),
       change: '+12.5%',
       changeType: 'positive',
       icon: 'ShoppingCart',
@@ -13,7 +23,7 @@ const OrderStats = ({ stats }) => {
     },
     {
       title: 'Pending Orders',
-      value: stats?.pending?.toLocaleString(),
+      value: stats?.pending?.toLocaleString('en-IN'),
       change: '+8.2%',
       changeType: 'positive',
       icon: 'Clock',
@@ -21,7 +31,7 @@ const OrderStats = ({ stats }) => {
     },
     {
       title: 'Processing',
-      value: stats?.processing?.toLocaleString(),
+      value: stats?.processing?.toLocaleString('en-IN'),
       change: '-3.1%',
       changeType: 'negative',
       icon: 'Package',
@@ -29,7 +39,7 @@ const OrderStats = ({ stats }) => {
     },
     {
       title: 'Delivered',
-      value: stats?.delivered?.toLocaleString(),
+      value: stats?.delivered?.toLocaleString('en-IN'),
       change: '+15.3%',
       changeType: 'positive',
       icon: 'CheckCircle',
@@ -37,7 +47,7 @@ const OrderStats = ({ stats }) => {
     },
     {
       title: 'Total Revenue',
-      value: `$${stats?.revenue?.toLocaleString()}`,
+      value: formatCurrency(stats?.revenue),
       change: '+18.7%',
       changeType: 'positive',
       icon: 'DollarSign',
@@ -45,7 +55,7 @@ const OrderStats = ({ stats }) => {
     },
     {
       title: 'Avg Order Value',
-      value: `$${stats?.avgOrderValue?.toFixed(2)}`,
+      value: formatCurrency(stats?.avgOrderValue),
       change: '+5.4%',
       changeType: 'positive',
       icon: 'TrendingUp',
@@ -72,7 +82,7 @@ const OrderStats = ({ stats }) => {
               <Icon name={stat?.icon} size={20} />
             </div>
             <div className={`text-xs font-medium px-2 py-1 rounded-full ${
-              stat?.changeType === 'positive' ?'bg-success/10 text-success' :'bg-error/10 text-error'
+              stat?.changeType === 'positive' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
             }`}>
               {stat?.change}
             </div>

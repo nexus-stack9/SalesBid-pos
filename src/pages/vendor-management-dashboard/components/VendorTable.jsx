@@ -1,6 +1,7 @@
 import React from 'react';
 import VendorTableRow, { VendorMobileCard } from './VendorTableRow';
 import Icon from '../../../components/AppIcon';
+import { Checkbox } from '../../../components/ui/Checkbox';
 
 const VendorTable = ({ 
   vendors, 
@@ -9,7 +10,8 @@ const VendorTable = ({
   selectedVendors, 
   onSelectAll,
   sortConfig,
-  onSort 
+  onSort,
+  onVendorActiveToggle
 }) => {
   const isAllSelected = vendors?.length > 0 && selectedVendors?.length === vendors?.length;
   const isIndeterminate = selectedVendors?.length > 0 && selectedVendors?.length < vendors?.length;
@@ -44,23 +46,19 @@ const VendorTable = ({
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="p-4 text-left">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isAllSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = isIndeterminate;
-                  }}
+                  indeterminate={isIndeterminate}
                   onChange={(e) => onSelectAll(e?.target?.checked)}
-                  className="rounded border-border"
                 />
               </th>
               <th className="p-4 text-left">
                 <button
-                  onClick={() => handleSort('companyName')}
+                  onClick={() => handleSort('business_name')}
                   className="flex items-center space-x-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
                 >
                   <span>Company</span>
-                  <Icon name={getSortIcon('companyName')} size={16} />
+                  <Icon name={getSortIcon('business_name')} size={16} />
                 </button>
               </th>
               <th className="p-4 text-left">
@@ -74,20 +72,20 @@ const VendorTable = ({
               </th>
               <th className="p-4 text-left">
                 <button
-                  onClick={() => handleSort('category')}
+                  onClick={() => handleSort('items_category')}
                   className="flex items-center space-x-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
                 >
                   <span>Category</span>
-                  <Icon name={getSortIcon('category')} size={16} />
+                  <Icon name={getSortIcon('items_category')} size={16} />
                 </button>
               </th>
               <th className="p-4 text-left">
                 <button
-                  onClick={() => handleSort('registrationDate')}
+                  onClick={() => handleSort('created_at')}
                   className="flex items-center space-x-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
                 >
                   <span>Registered</span>
-                  <Icon name={getSortIcon('registrationDate')} size={16} />
+                  <Icon name={getSortIcon('created_at')} size={16} />
                 </button>
               </th>
               <th className="p-4 text-left text-sm font-medium text-foreground">Status</th>
@@ -97,25 +95,28 @@ const VendorTable = ({
           <tbody>
             {vendors?.map((vendor) => (
               <VendorTableRow
-                key={vendor?.id}
+                key={vendor?.vendor_id || vendor?.id}
                 vendor={vendor}
                 onStatusChange={onStatusChange}
                 onBulkSelect={onBulkSelect}
-                isSelected={selectedVendors?.includes(vendor?.id)}
+                isSelected={selectedVendors?.includes(vendor?.vendor_id || vendor?.id)}
+                onVendorActiveToggle={onVendorActiveToggle}
               />
             ))}
           </tbody>
         </table>
       </div>
+
       {/* Mobile Cards */}
       <div className="lg:hidden p-4 space-y-4">
         {vendors?.map((vendor) => (
           <VendorMobileCard
-            key={vendor?.id}
+            key={vendor?.vendor_id || vendor?.id}
             vendor={vendor}
             onStatusChange={onStatusChange}
             onBulkSelect={onBulkSelect}
-            isSelected={selectedVendors?.includes(vendor?.id)}
+            isSelected={selectedVendors?.includes(vendor?.vendor_id || vendor?.id)}
+            onVendorActiveToggle={onVendorActiveToggle}
           />
         ))}
       </div>

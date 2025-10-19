@@ -43,13 +43,13 @@ const ProductViewModal = ({ isOpen, onClose, product }) => {
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1">Status</label>
             <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-              product?.isActive
+              product?.isactive
                 ? 'bg-success/10 text-success' :'bg-secondary/10 text-secondary'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                product?.isActive ? 'bg-success' : 'bg-secondary'
+                product?.isactive ? 'bg-success' : 'bg-secondary'
               }`} />
-              <span>{product?.isActive ? 'Active' : 'Inactive'}</span>
+              <span>{product?.isactive ? 'Active' : 'Inactive'}</span>
             </span>
           </div>
           <div>
