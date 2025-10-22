@@ -2,6 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from '../AppIcon';
 import Button from './Button';
+import axios from 'axios';
+import WebRTCStreamer, { getUserMediaForStreaming, isWebRTCSupported } from '../../utils/webrtcStreaming';
+import toast from 'react-hot-toast';
 
 const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -10,8 +13,14 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   const [viewerCount, setViewerCount] = useState(0);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [streamData, setStreamData] = useState(null);
+  const [playbackUrl, setPlaybackUrl] = useState('');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const webrtcStreamerRef = useRef(null);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
   useEffect(() => {
     if (product) {
@@ -26,12 +35,57 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (webrtcStreamerRef.current) {
+        webrtcStreamerRef.current.disconnect();
+      }
     };
   }, []);
 
+  // Monitor connection status
+  useEffect(() => {
+    if (!webrtcStreamerRef.current) return;
+
+    const interval = setInterval(() => {
+      const state = webrtcStreamerRef.current.getConnectionState();
+      setConnectionStatus(state);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isStreaming]);
+
   const startStream = async () => {
+    if (!isWebRTCSupported()) {
+      toast.error('Your browser does not support WebRTC streaming');
+      return;
+    }
+
+    if (!product?.product_id) {
+      toast.error('Product information is missing');
+      return;
+    }
+
+    setIsConnecting(true);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Step 1: Create live stream on backend
+      toast.loading('Setting up live stream...', { id: 'setup' });
+      const createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
+        productId: product.product_id,
+        productName: streamTitle || product.name
+      });
+
+      if (!createResponse.data.success) {
+        throw new Error('Failed to create live stream');
+      }
+
+      const liveStreamData = createResponse.data.data;
+      setStreamData(liveStreamData);
+      setPlaybackUrl(liveStreamData.playbackUrl);
+      toast.success('Live stream created', { id: 'setup' });
+
+      // Step 2: Get user media
+      toast.loading('Accessing camera...', { id: 'camera' });
+      const stream = await getUserMediaForStreaming({
         video: {
           width: { ideal: 1920 },
           height: { ideal: 1080 },
@@ -44,16 +98,69 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
       }
+      toast.success('Camera ready', { id: 'camera' });
+
+      // Step 3: Get WebRTC URL
+      toast.loading('Connecting to stream server...', { id: 'connect' });
+      const webrtcResponse = await axios.get(
+        `${API_BASE_URL}/livestream/${product.product_id}/webrtc`
+      );
+
+      if (!webrtcResponse.data.success) {
+        throw new Error('Failed to get WebRTC URL');
+      }
+
+      const webrtcUrl = webrtcResponse.data.data.webRTCUrl;
+
+      // Check if WebRTC is available
+      if (!webrtcUrl) {
+        toast.dismiss('connect');
+        toast.error(
+          'WebRTC streaming is not available. Please use OBS or similar software with RTMP.',
+          { duration: 6000 }
+        );
+        
+        // Show RTMP details to user
+        const rtmpUrl = webrtcResponse.data.data.rtmpUrl;
+        const streamKey = webrtcResponse.data.data.streamKey;
+        
+        console.log('RTMP URL:', rtmpUrl);
+        console.log('Stream Key:', streamKey);
+        
+        toast.error(
+          `RTMP URL: ${rtmpUrl}\nStream Key: ${streamKey}`,
+          { duration: 10000 }
+        );
+        
+        throw new Error('WebRTC not available. Use RTMP streaming with OBS or similar software.');
+      }
+
+      // Step 4: Connect via WebRTC
+      webrtcStreamerRef.current = new WebRTCStreamer();
+      await webrtcStreamerRef.current.connect(webrtcUrl, stream);
+      toast.success('Connected to stream server', { id: 'connect' });
+
+      // Step 5: Mark stream as live
+      await axios.post(`${API_BASE_URL}/livestream/start`, {
+        productId: product.product_id
+      });
 
       setIsStreaming(true);
+      setConnectionStatus('connected');
       
       // Call parent callback
-      onGoLive({
-        productId: product?.product_id,
-        title: streamTitle,
-        description: streamDescription,
-        startTime: new Date().toISOString()
-      });
+      if (onGoLive) {
+        onGoLive({
+          productId: product?.product_id,
+          title: streamTitle,
+          description: streamDescription,
+          startTime: new Date().toISOString(),
+          playbackUrl: liveStreamData.playbackUrl,
+          hlsUrl: liveStreamData.hlsUrl
+        });
+      }
+
+      toast.success('You are now LIVE! 🔴');
 
       // Simulate viewer count updates
       const viewerInterval = setInterval(() => {
@@ -62,21 +169,63 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
       return () => clearInterval(viewerInterval);
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Could not access camera. Please check permissions.');
+      console.error('Error starting stream:', error);
+      
+      // Cleanup on error
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (webrtcStreamerRef.current) {
+        webrtcStreamerRef.current.disconnect();
+        webrtcStreamerRef.current = null;
+      }
+
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to start stream';
+      toast.error(errorMessage);
+    } finally {
+      setIsConnecting(false);
     }
   };
 
-  const stopStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  const stopStream = async () => {
+    try {
+      toast.loading('Stopping stream...', { id: 'stop' });
+
+      // Stop WebRTC connection
+      if (webrtcStreamerRef.current) {
+        webrtcStreamerRef.current.disconnect();
+        webrtcStreamerRef.current = null;
+      }
+
+      // Stop local media tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+
+      // Mark stream as stopped on backend
+      if (product?.product_id) {
+        await axios.post(`${API_BASE_URL}/livestream/stop`, {
+          productId: product.product_id
+        });
+      }
+
+      setIsStreaming(false);
+      setViewerCount(0);
+      setConnectionStatus('disconnected');
+      setStreamData(null);
+      setPlaybackUrl('');
+      
+      toast.success('Stream stopped', { id: 'stop' });
+    } catch (error) {
+      console.error('Error stopping stream:', error);
+      toast.error('Error stopping stream', { id: 'stop' });
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsStreaming(false);
-    setViewerCount(0);
   };
 
   const handleClose = () => {
@@ -97,23 +246,55 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   };
 
   const switchCamera = async () => {
-    if (streamRef.current) {
+    if (!streamRef.current || !webrtcStreamerRef.current) return;
+
+    try {
       const videoTrack = streamRef.current.getVideoTracks()[0];
       const currentFacingMode = videoTrack.getSettings().facingMode;
       
-      stopStream();
+      // Stop current tracks
+      streamRef.current.getTracks().forEach(track => track.stop());
       
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Get new stream with switched camera
+      const newStream = await getUserMediaForStreaming({
         video: {
           facingMode: currentFacingMode === 'user' ? 'environment' : 'user'
         },
         audio: true
       });
 
+      // Update video element
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
+        videoRef.current.srcObject = newStream;
+        streamRef.current = newStream;
       }
+
+      // Replace tracks in WebRTC connection
+      const senders = webrtcStreamerRef.current.peerConnection.getSenders();
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+
+      senders.forEach(sender => {
+        if (sender.track.kind === 'video' && newVideoTrack) {
+          sender.replaceTrack(newVideoTrack);
+        } else if (sender.track.kind === 'audio' && newAudioTrack) {
+          sender.replaceTrack(newAudioTrack);
+        }
+      });
+
+      toast.success('Camera switched');
+    } catch (error) {
+      console.error('Error switching camera:', error);
+      toast.error('Failed to switch camera');
+    }
+  };
+
+  const copyPlaybackUrl = () => {
+    if (product?.product_id) {
+      // Create shareable viewer URL
+      const viewerUrl = `${window.location.origin}/live/${product.product_id}`;
+      navigator.clipboard.writeText(viewerUrl);
+      toast.success('Viewer URL copied! Share this link with your audience.', { duration: 4000 });
     }
   };
 
@@ -177,11 +358,12 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
                   <Button
                     onClick={startStream}
-                    className="bg-red-500 hover:bg-red-600 text-white"
+                    disabled={isConnecting}
+                    className="bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
                     iconName="Video"
                     iconPosition="left"
                   >
-                    Start Live Stream
+                    {isConnecting ? 'Connecting...' : 'Start Live Stream'}
                   </Button>
                 </div>
               </div>
@@ -223,8 +405,34 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
                 {/* Stream Info Overlay */}
                 <div className="absolute top-4 left-4 right-4">
                   <div className="bg-black/60 backdrop-blur-sm rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          connectionStatus === 'connected' ? 'bg-green-500' :
+                          connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                          'bg-red-500'
+                        }`} />
+                        <span className="text-xs text-white uppercase">{connectionStatus}</span>
+                      </div>
+                      {isStreaming && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={copyPlaybackUrl}
+                          className="bg-white/10 hover:bg-white/20 text-white text-xs"
+                        >
+                          <Icon name="Share2" size={14} className="mr-1" />
+                          Share Link
+                        </Button>
+                      )}
+                    </div>
                     <h3 className="font-medium text-white">{streamTitle}</h3>
                     <p className="text-sm text-gray-300">{streamDescription}</p>
+                    {playbackUrl && (
+                      <div className="text-xs text-gray-400 truncate">
+                        Playback: {playbackUrl}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
