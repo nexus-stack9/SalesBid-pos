@@ -1,4 +1,3 @@
-// components/ui/GoLiveModal.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from '../AppIcon';
 import Button from './Button';
@@ -11,12 +10,12 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   const [streamTitle, setStreamTitle] = useState('');
   const [streamDescription, setStreamDescription] = useState('');
   const [viewerCount, setViewerCount] = useState(0);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [streamData, setStreamData] = useState(null);
   const [playbackUrl, setPlaybackUrl] = useState('');
+  const [streamStartTime, setStreamStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState('00:00:00');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const webrtcStreamerRef = useRef(null);
@@ -25,12 +24,10 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   useEffect(() => {
     if (product) {
       setStreamTitle(`Live Auction: ${product?.name}`);
-      setStreamDescription(`Showcasing ${product?.name} - Starting price: ₹${product?.starting_price}`);
     }
   }, [product]);
 
   useEffect(() => {
-    // Cleanup stream on unmount
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -41,7 +38,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     };
   }, []);
 
-  // Monitor connection status
   useEffect(() => {
     if (!webrtcStreamerRef.current) return;
 
@@ -52,6 +48,23 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
     return () => clearInterval(interval);
   }, [isStreaming]);
+
+  useEffect(() => {
+    if (!isStreaming || !streamStartTime) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = now - streamStartTime;
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setElapsedTime(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isStreaming, streamStartTime]);
 
   const startStream = async () => {
     if (!isWebRTCSupported()) {
@@ -67,12 +80,35 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     setIsConnecting(true);
 
     try {
-      // Step 1: Create live stream on backend
       toast.loading('Setting up live stream...', { id: 'setup' });
-      const createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
-        productId: product.product_id,
-        productName: streamTitle || product.name
-      });
+      
+      // First, try to create the live stream
+      let createResponse;
+      try {
+        createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
+          productId: product.product_id,
+          productName: streamTitle || product.name
+        });
+      } catch (error) {
+        // If we get an error about existing stream, delete it and retry
+        if (error.response?.data?.error === 'Product already has an active live stream') {
+          const liveInputId = error.response.data.liveInputId;
+          toast.loading('Cleaning up existing stream...', { id: 'cleanup' });
+          
+          // Delete the existing live input
+          await axios.delete(`${API_BASE_URL}/livestream/delete/${liveInputId}`);
+          toast.dismiss('cleanup');
+          
+          // Retry creating the live stream
+          toast.loading('Setting up new live stream...', { id: 'setup' });
+          createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
+            productId: product.product_id,
+            productName: streamTitle || product.name
+          });
+        } else {
+          throw error; // Re-throw if it's a different error
+        }
+      }
 
       if (!createResponse.data.success) {
         throw new Error('Failed to create live stream');
@@ -83,7 +119,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       setPlaybackUrl(liveStreamData.playbackUrl);
       toast.success('Live stream created', { id: 'setup' });
 
-      // Step 2: Get user media
       toast.loading('Accessing camera...', { id: 'camera' });
       const stream = await getUserMediaForStreaming({
         video: {
@@ -100,7 +135,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       }
       toast.success('Camera ready', { id: 'camera' });
 
-      // Step 3: Get WebRTC URL
       toast.loading('Connecting to stream server...', { id: 'connect' });
       const webrtcResponse = await axios.get(
         `${API_BASE_URL}/livestream/${product.product_id}/webrtc`
@@ -112,7 +146,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
       const webrtcUrl = webrtcResponse.data.data.webRTCUrl;
 
-      // Check if WebRTC is available
       if (!webrtcUrl) {
         toast.dismiss('connect');
         toast.error(
@@ -120,7 +153,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
           { duration: 6000 }
         );
         
-        // Show RTMP details to user
         const rtmpUrl = webrtcResponse.data.data.rtmpUrl;
         const streamKey = webrtcResponse.data.data.streamKey;
         
@@ -135,20 +167,18 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
         throw new Error('WebRTC not available. Use RTMP streaming with OBS or similar software.');
       }
 
-      // Step 4: Connect via WebRTC
       webrtcStreamerRef.current = new WebRTCStreamer();
       await webrtcStreamerRef.current.connect(webrtcUrl, stream);
       toast.success('Connected to stream server', { id: 'connect' });
 
-      // Step 5: Mark stream as live
       await axios.post(`${API_BASE_URL}/livestream/start`, {
         productId: product.product_id
       });
 
       setIsStreaming(true);
+      setStreamStartTime(Date.now());
       setConnectionStatus('connected');
       
-      // Call parent callback
       if (onGoLive) {
         onGoLive({
           productId: product?.product_id,
@@ -162,7 +192,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
       toast.success('You are now LIVE! 🔴');
 
-      // Simulate viewer count updates
       const viewerInterval = setInterval(() => {
         setViewerCount(prev => prev + Math.floor(Math.random() * 5));
       }, 3000);
@@ -171,7 +200,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     } catch (error) {
       console.error('Error starting stream:', error);
       
-      // Cleanup on error
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -192,13 +220,11 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     try {
       toast.loading('Stopping stream...', { id: 'stop' });
 
-      // Stop WebRTC connection
       if (webrtcStreamerRef.current) {
         webrtcStreamerRef.current.disconnect();
         webrtcStreamerRef.current = null;
       }
 
-      // Stop local media tracks
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -208,7 +234,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
         videoRef.current.srcObject = null;
       }
 
-      // Mark stream as stopped on backend
       if (product?.product_id) {
         await axios.post(`${API_BASE_URL}/livestream/stop`, {
           productId: product.product_id
@@ -220,6 +245,8 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       setConnectionStatus('disconnected');
       setStreamData(null);
       setPlaybackUrl('');
+      setStreamStartTime(null);
+      setElapsedTime('00:00:00');
       
       toast.success('Stream stopped', { id: 'stop' });
     } catch (error) {
@@ -229,19 +256,13 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   };
 
   const handleClose = () => {
-    stopStream();
-    onClose();
-  };
-
-  const handleSendComment = () => {
-    if (newComment.trim()) {
-      setComments([...comments, {
-        id: Date.now(),
-        user: 'Host',
-        message: newComment,
-        timestamp: new Date().toLocaleTimeString()
-      }]);
-      setNewComment('');
+    if (isStreaming) {
+      if (window.confirm('Are you sure you want to end the live stream?')) {
+        stopStream();
+        onClose();
+      }
+    } else {
+      onClose();
     }
   };
 
@@ -252,10 +273,8 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       const videoTrack = streamRef.current.getVideoTracks()[0];
       const currentFacingMode = videoTrack.getSettings().facingMode;
       
-      // Stop current tracks
       streamRef.current.getTracks().forEach(track => track.stop());
       
-      // Get new stream with switched camera
       const newStream = await getUserMediaForStreaming({
         video: {
           facingMode: currentFacingMode === 'user' ? 'environment' : 'user'
@@ -263,13 +282,11 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
         audio: true
       });
 
-      // Update video element
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
         streamRef.current = newStream;
       }
 
-      // Replace tracks in WebRTC connection
       const senders = webrtcStreamerRef.current.peerConnection.getSenders();
       const newVideoTrack = newStream.getVideoTracks()[0];
       const newAudioTrack = newStream.getAudioTracks()[0];
@@ -291,7 +308,6 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
   const copyPlaybackUrl = () => {
     if (product?.product_id) {
-      // Create shareable viewer URL
       const viewerUrl = `${window.location.origin}/live/${product.product_id}`;
       navigator.clipboard.writeText(viewerUrl);
       toast.success('Viewer URL copied! Share this link with your audience.', { duration: 4000 });
@@ -301,238 +317,205 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-      <div className="bg-card rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+      <div className="w-full h-full md:w-[90vw] md:max-w-6xl md:h-[85vh] bg-background md:rounded-xl overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border flex-shrink-0">
           <div className="flex items-center space-x-3">
-            <div className={`w-3 h-3 rounded-full ${isStreaming ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`} />
-            <h2 className="text-xl font-semibold text-foreground">
+            <div className={`w-2.5 h-2.5 rounded-full ${isStreaming ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`} />
+            <h2 className="text-lg font-semibold text-foreground">
               {isStreaming ? 'LIVE' : 'Go Live'}
             </h2>
-            {isStreaming && (
-              <span className="flex items-center space-x-1 text-sm text-muted-foreground">
-                <Icon name="Users" size={16} />
-                <span>{viewerCount} viewers</span>
+            {/* {isStreaming && (
+              <span className="flex items-center space-x-1.5 text-sm text-muted-foreground">
+                <Icon name="Users" size={14} />
+                <span className="font-medium">{viewerCount}</span>
               </span>
-            )}
+            )} */}
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClose}
+            className="h-8 w-8 p-0"
           >
-            <Icon name="X" size={20} />
+            <Icon name="X" size={18} />
           </Button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Video Section */}
-          <div className="flex-1 bg-black relative">
-            {!isStreaming ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <Icon name="Video" size={64} className="text-muted-foreground mx-auto" />
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-medium text-white">Ready to go live?</h3>
-                    <p className="text-sm text-gray-400">Start streaming to showcase {product?.name}</p>
+          <div className="flex-1 bg-black relative flex items-center justify-center">
+            {/* Video element */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-contain ${!isStreaming ? 'hidden' : ''}`}
+              style={{ transform: 'scaleX(-1)' }}
+            />
+            
+            {/* Pre-stream Setup */}
+            {!isStreaming && (
+              <div className="absolute inset-0 flex items-center justify-center p-6">
+                <div className="text-center space-y-6 max-w-md w-full">
+                  <div className="space-y-3">
+                    <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center">
+                      <Icon name="Video" size={32} className="text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-white">Ready to go live?</h3>
+                    <p className="text-sm text-gray-400">Start streaming {product?.name}</p>
                   </div>
                   
-                  <div className="space-y-3 max-w-md mx-auto">
+                  <div className="space-y-3">
                     <input
                       type="text"
                       value={streamTitle}
                       onChange={(e) => setStreamTitle(e.target.value)}
                       placeholder="Stream Title"
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                     <textarea
                       value={streamDescription}
                       onChange={(e) => setStreamDescription(e.target.value)}
-                      placeholder="Stream Description"
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white resize-none"
+                      placeholder="Stream Description (optional)"
+                      rows={2}
+                      className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder:text-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
 
                   <Button
                     onClick={startStream}
                     disabled={isConnecting}
-                    className="bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
-                    iconName="Video"
-                    iconPosition="left"
+                    className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    {isConnecting ? 'Connecting...' : 'Start Live Stream'}
+                    {isConnecting ? (
+                      <>
+                        <Icon name="Loader" size={18} className="mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Video" size={18} className="mr-2" />
+                        Start Live Stream
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
-            ) : (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                
-                {/* Stream Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={switchCamera}
-                        className="bg-white/10 hover:bg-white/20 text-white"
-                      >
-                        <Icon name="RefreshCw" size={20} />
-                      </Button>
-                    </div>
-                    
+            )}
+            
+            {/* Stream Controls Overlay */}
+            {isStreaming && (
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/50 to-transparent">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 md:invisible">
                     <Button
-                      onClick={stopStream}
-                      className="bg-red-500 hover:bg-red-600 text-white"
-                      iconName="StopCircle"
-                      iconPosition="left"
+                      variant="ghost"
+                      size="sm"
+                      onClick={switchCamera}
+                      className="h-10 w-10 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
                     >
-                      End Stream
+                      <Icon name="RefreshCw" size={18} />
                     </Button>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-md">
+                      <span className="text-white text-sm font-mono">{elapsedTime}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Connection Status Indicator */}
+            {isStreaming && (
+              <div className="absolute top-4 left-4">
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded-full">
+                  <div className={`w-2 h-2 rounded-full ${
+                    connectionStatus === 'connected' ? 'bg-green-500' :
+                    connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                    'bg-red-500'
+                  }`} />
+                  <span className="text-xs text-white uppercase font-medium">{connectionStatus}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Sidebar - Product Info & Actions */}
+          {isStreaming && (
+            <div className="w-full md:w-80 md:max-w-sm bg-card border-t md:border-t-0 md:border-l border-border flex flex-col overflow-y-auto">
+              {/* Product Details */}
+              <div className="p-4 space-y-4">
+                <div className="flex items-start space-x-3">
+                  <img
+                    src={product?.image_path}
+                    alt={product?.name}
+                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-border"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-foreground text-sm mb-1 line-clamp-2">{product?.name}</h4>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Starting</span>
+                        <span className="font-medium text-foreground">₹{product?.starting_price}</span>
+                      </div>
+                      {product?.bid_amount && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Current Bid</span>
+                          <span className="font-semibold text-green-500">₹{product?.bid_amount}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Stream Info Overlay */}
-                <div className="absolute top-4 left-4 right-4">
-                  <div className="bg-black/60 backdrop-blur-sm rounded-lg p-3 space-y-2">
+                {/* Current Bid Highlight */}
+                {product?.bid_amount && (
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          connectionStatus === 'connected' ? 'bg-green-500' :
-                          connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                          'bg-red-500'
-                        }`} />
-                        <span className="text-xs text-white uppercase">{connectionStatus}</span>
+                      <div>
+                        <p className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Current Highest Bid</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">₹{product?.bid_amount}</p>
                       </div>
-                      {isStreaming && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={copyPlaybackUrl}
-                          className="bg-white/10 hover:bg-white/20 text-white text-xs"
-                        >
-                          <Icon name="Share2" size={14} className="mr-1" />
-                          Share Link
-                        </Button>
-                      )}
+                      <Icon name="TrendingUp" size={32} className="text-green-500/50" />
                     </div>
-                    <h3 className="font-medium text-white">{streamTitle}</h3>
-                    <p className="text-sm text-gray-300">{streamDescription}</p>
-                    {playbackUrl && (
-                      <div className="text-xs text-gray-400 truncate">
-                        Playback: {playbackUrl}
+                  </div>
+                )}
+
+                {/* End Stream Button */}
+                <Button
+                  onClick={stopStream}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 transition-all"
+                >
+                  <Icon name="StopCircle" size={18} className="mr-2" />
+                  End Live Stream
+                </Button>
+
+                {/* Stream Info */}
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">Stream Details</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-2">
+                      <Icon name="Radio" size={14} className="text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-foreground line-clamp-1">{streamTitle}</p>
+                    </div>
+                    {streamDescription && (
+                      <div className="flex items-start space-x-2">
+                        <Icon name="FileText" size={14} className="text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-muted-foreground line-clamp-2">{streamDescription}</p>
                       </div>
                     )}
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Chat/Info Sidebar */}
-          <div className="w-full lg:w-96 bg-muted/50 border-t lg:border-t-0 lg:border-l border-border flex flex-col max-h-96 lg:max-h-full">
-            {/* Product Info */}
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center space-x-3">
-                <img
-                  src={product?.image_path}
-                  alt={product?.name}
-                  className="w-16 h-16 rounded-lg object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-foreground truncate">{product?.name}</h4>
-                  <p className="text-sm text-muted-foreground">Starting: ₹{product?.starting_price}</p>
-                  {product?.bid_amount && (
-                    <p className="text-sm text-success font-medium">Current: ₹{product?.bid_amount}</p>
-                  )}
-                </div>
               </div>
             </div>
-
-            {/* Live Comments */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              <h4 className="font-medium text-foreground mb-2">Live Chat</h4>
-              
-              {comments.length === 0 ? (
-                <div className="text-center text-muted-foreground text-sm py-8">
-                  <Icon name="MessageCircle" size={32} className="mx-auto mb-2 opacity-50" />
-                  <p>No comments yet</p>
-                  <p className="text-xs mt-1">Start the conversation!</p>
-                </div>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="bg-background rounded-lg p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm text-foreground">{comment.user}</span>
-                      <span className="text-xs text-muted-foreground">{comment.timestamp}</span>
-                    </div>
-                    <p className="text-sm text-foreground">{comment.message}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Comment Input */}
-            <div className="p-4 border-t border-border">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-                  placeholder="Send a message..."
-                  className="flex-1 px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled={!isStreaming}
-                />
-                <Button
-                  onClick={handleSendComment}
-                  disabled={!isStreaming || !newComment.trim()}
-                  size="sm"
-                >
-                  <Icon name="Send" size={16} />
-                </Button>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
-
-        {/* Stream Stats Footer */}
-        {isStreaming && (
-          <div className="p-4 border-t border-border bg-muted/30">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">{viewerCount}</p>
-                <p className="text-xs text-muted-foreground">Viewers</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">{comments.length}</p>
-                <p className="text-xs text-muted-foreground">Comments</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-success">
-                  {product?.bid_amount ? `₹${product.bid_amount}` : '-'}
-                </p>
-                <p className="text-xs text-muted-foreground">Current Bid</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">
-                  {new Date().toLocaleTimeString()}
-                </p>
-                <p className="text-xs text-muted-foreground">Stream Time</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
