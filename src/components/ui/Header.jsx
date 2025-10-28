@@ -5,9 +5,9 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import { getAllVendors, getAllProductsByVendorId } from '../../services/posCrud';
 
-const Header = () => {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+const Sidebar = () => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [vendorCount, setVendorCount] = useState(0);
@@ -120,7 +120,6 @@ const Header = () => {
     if (searchQuery?.trim()) {
       console.log('Searching for:', searchQuery);
       setSearchQuery('');
-      setIsSearchOpen(false);
     }
   };
 
@@ -149,120 +148,152 @@ const Header = () => {
     navigate('/login');
   };
 
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-card border-b border-border h-16">
-      <div className="flex items-center justify-between h-full px-6">
-        {/* Logo */}
-        <Link to="/vendor-management-dashboard" className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+  const SidebarContent = ({ isMobile = false }) => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center justify-between p-6 border-b border-border">
+        <Link 
+          to="/vendor-management-dashboard" 
+          className="flex items-center space-x-3"
+          onClick={() => isMobile && setIsMobileSidebarOpen(false)}
+        >
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <Icon name="Store" size={20} color="white" />
           </div>
-          <span className="text-xl font-semibold text-foreground">Sales Bid</span>
+          {(!isCollapsed || isMobile) && (
+            <span className="text-xl font-semibold text-foreground">Sales Bid</span>
+          )}
         </Link>
+        {/* {!isMobile && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="hidden md:flex"
+          >
+            <Icon name={isCollapsed ? "ChevronRight" : "ChevronLeft"} size={18} />
+          </Button>
+        )} */}
+      </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-8">
-          {navigationItems?.map((item) => (
-            <Link
-              key={item?.path}
-              to={item?.path}
-              className={`relative flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ${
-                isActiveRoute(item)
-                  ? 'text-primary bg-primary/10' :'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              <Icon name={item?.icon} size={18} />
-              <span>{item?.label}</span>
-              {item?.badge > 0 && (
-                <span className="absolute -top-1 -right-1 bg-error text-error-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
-                  {item?.badge}
-                </span>
-              )}
-            </Link>
-          ))}
-        </nav>
+      {/* Search */}
+      {/* {(!isCollapsed || isMobile) && (
+        <div className="p-4 border-b border-border">
+          <form onSubmit={handleSearch} className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e?.target?.value)}
+              placeholder="Search..."
+              className="w-full pl-10 pr-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+            />
+            <Icon 
+              name="Search" 
+              size={16} 
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" 
+            />
+          </form>
+        </div>
+      )} */}
 
-        {/* Right Section */}
-        <div className="flex items-center space-x-4">
-          {/* Search */}
-          <div className="relative">
-            {isSearchOpen ? (
-              <form onSubmit={handleSearch} className="flex items-center">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e?.target?.value)}
-                  placeholder="Search vendors, products, orders..."
-                  className="w-64 px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                  autoFocus
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsSearchOpen(false)}
-                  className="ml-2"
-                >
-                  <Icon name="X" size={16} />
-                </Button>
-              </form>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsSearchOpen(true)}
-                className="hidden md:flex"
-              >
-                <Icon name="Search" size={18} />
-              </Button>
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        {navigationItems?.map((item) => (
+          <Link
+            key={item?.path}
+            to={item?.path}
+            onClick={() => isMobile && setIsMobileSidebarOpen(false)}
+            className={`relative flex items-center ${
+              isCollapsed && !isMobile ? 'justify-center' : 'justify-between'
+            } px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group ${
+              isActiveRoute(item)
+                ? 'text-primary bg-primary/10' 
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+            title={isCollapsed && !isMobile ? item?.label : ''}
+          >
+            <div className="flex items-center space-x-3">
+              <Icon name={item?.icon} size={20} className="flex-shrink-0" />
+              {(!isCollapsed || isMobile) && <span>{item?.label}</span>}
+            </div>
+            {item?.badge > 0 && (!isCollapsed || isMobile) && (
+              <span className="bg-error text-error-foreground text-xs rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center font-medium">
+                {item?.badge}
+              </span>
             )}
-          </div>
+            {item?.badge > 0 && isCollapsed && !isMobile && (
+              <span className="absolute -top-1 -right-1 bg-error text-error-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                {item?.badge}
+              </span>
+            )}
+          </Link>
+        ))}
 
-          {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative hidden md:flex">
-            <Icon name="Bell" size={18} />
+        {/* Notifications */}
+        {/* <button
+          className={`relative flex items-center ${
+            isCollapsed && !isMobile ? 'justify-center' : 'justify-between'
+          } w-full px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-muted`}
+          title={isCollapsed && !isMobile ? 'Notifications' : ''}
+        >
+          <div className="flex items-center space-x-3">
+            <Icon name="Bell" size={20} className="flex-shrink-0" />
+            {(!isCollapsed || isMobile) && <span>Notifications</span>}
+          </div>
+          {(!isCollapsed || isMobile) && (
+            <span className="bg-error text-error-foreground text-xs rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center font-medium">
+              3
+            </span>
+          )}
+          {isCollapsed && !isMobile && (
             <span className="absolute -top-1 -right-1 bg-error text-error-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
               3
             </span>
-          </Button>
+          )}
+        </button> */}
+      </nav>
 
-          {/* User Profile */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="flex items-center space-x-2"
-            >
-              <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
+      {/* User Profile */}
+      <div className="p-4 border-t border-border">
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            className={`w-full flex items-center ${
+              isCollapsed && !isMobile ? 'justify-center' : 'justify-between'
+            } hover:bg-muted`}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center flex-shrink-0">
                 <Icon name="User" size={16} color="white" />
               </div>
-              <span className="hidden md:block text-sm font-medium">
-                {userData?.name || 'User'}
-              </span>
-              <Icon name="ChevronDown" size={16} />
-            </Button>
-
-            {isProfileOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-popover border border-border rounded-md shadow-dropdown z-50">
-                <div className="p-3 border-b border-border">
-                  <p className="text-sm font-medium">
+              {(!isCollapsed || isMobile) && (
+                <div className="text-left">
+                  <p className="text-sm font-medium truncate max-w-[150px]">
                     {userData?.name || 'User'}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground truncate max-w-[150px]">
                     {userData?.email || 'user@example.com'}
                   </p>
                 </div>
+              )}
+            </div>
+            {(!isCollapsed || isMobile) && <Icon name="ChevronDown" size={16} />}
+          </Button>
+
+          {isProfileOpen && (
+            <>
+              {/* Backdrop for mobile */}
+              <div 
+                className="fixed inset-0 z-40 md:hidden" 
+                onClick={() => setIsProfileOpen(false)}
+              />
+              
+              <div className={`absolute ${
+                isCollapsed && !isMobile ? 'left-full ml-2 bottom-0' : 'left-0 bottom-full mb-2'
+              } w-48 bg-popover border border-border rounded-md shadow-dropdown z-50`}>
                 <div className="py-1">
-                  {/* <button className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2">
-                    <Icon name="Settings" size={16} />
-                    <span>Settings</span>
-                  </button>
-                  <button className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2">
-                    <Icon name="HelpCircle" size={16} />
-                    <span>Help</span>
-                  </button> */}
-                  <hr className="my-1 border-border" />
                   <button
                     onClick={handleLogout}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center space-x-2 text-error"
@@ -272,78 +303,66 @@ const Header = () => {
                   </button>
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
-          {/* Mobile Menu Button */}
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden md:flex fixed left-0 top-0 bottom-0 z-30 bg-card border-r border-border transition-all duration-300 ${
+          isCollapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Header */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-30 bg-card border-b border-border h-16">
+        <div className="flex items-center justify-between h-full px-4">
+          <Link to="/vendor-management-dashboard" className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Icon name="Store" size={20} color="white" />
+            </div>
+            <span className="text-xl font-semibold text-foreground">Sales Bid</span>
+          </Link>
+
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden"
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           >
-            <Icon name={isMobileMenuOpen ? "X" : "Menu"} size={20} />
+            <Icon name={isMobileSidebarOpen ? "X" : "Menu"} size={24} />
           </Button>
         </div>
-      </div>
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-background z-40 border-t border-border">
-          <div className="p-4 space-y-4">
-            {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e?.target?.value)}
-                placeholder="Search..."
-                className="flex-1 px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              <Button type="submit" size="sm">
-                <Icon name="Search" size={16} />
-              </Button>
-            </form>
+      </header>
 
-            {/* Mobile Navigation */}
-            <nav className="space-y-2">
-              {navigationItems?.map((item) => (
-                <Link
-                  key={item?.path}
-                  to={item?.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between p-3 rounded-md text-sm font-medium transition-colors ${
-                    isActiveRoute(item)
-                      ? 'text-primary bg-primary/10' :'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <Icon name={item?.icon} size={20} />
-                    <span>{item?.label}</span>
-                  </div>
-                  {item?.badge > 0 && (
-                    <span className="bg-error text-error-foreground text-xs rounded-full w-6 h-6 flex items-center justify-center font-medium">
-                      {item?.badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Mobile Notifications */}
-            <button className="flex items-center justify-between w-full p-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted">
-              <div className="flex items-center space-x-3">
-                <Icon name="Bell" size={20} />
-                <span>Notifications</span>
-              </div>
-              <span className="bg-error text-error-foreground text-xs rounded-full w-6 h-6 flex items-center justify-center font-medium">
-                3
-              </span>
-            </button>
-          </div>
-        </div>
+      {/* Mobile Sidebar */}
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40 top-16"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          
+          {/* Sidebar */}
+          <aside className="md:hidden fixed left-0 top-16 bottom-0 w-64 z-50 bg-card border-r border-border transform transition-transform duration-300">
+            <SidebarContent isMobile={true} />
+          </aside>
+        </>
       )}
-    </header>
+
+      {/* Spacer for main content - THIS IS KEY */}
+      <div className={`hidden md:block transition-all duration-300 ${
+        isCollapsed ? 'w-20' : 'w-64'
+      }`} />
+    </>
   );
 };
 
-export default Header;
+export default Sidebar;
