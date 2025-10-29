@@ -40,9 +40,7 @@ const ProductCatalogManagement = () => {
     setError(null);
     try {
       const userData = getUserData();
-      
-      console.log("userData:", userData);
-      console.log("vendorId:", userData?.vendorId);
+     
       
       if (!userData?.vendorId) {
         setError("Vendor ID not found");
@@ -54,24 +52,20 @@ const ProductCatalogManagement = () => {
 
       const response = await getAllProductsByVendorId(userData.vendorId);
       
-      console.log("Full response:", response);
-      console.log("Response data:", response?.data);
+      
       
       if (response?.data && Array.isArray(response.data)) {
         setProducts(response.data);
         setFilteredProducts(response.data);
-        console.log(`✅ Loaded ${response.data.length} products`);
       } else {
         setProducts([]);
         setFilteredProducts([]);
-        console.log("⚠️ No products found or invalid data format");
       }
       
     } catch (err) {
       console.error("❌ Error details:", err);
       
       if (err.response?.status === 204) {
-        console.log("ℹ️ 204: No products available for this vendor");
         setProducts([]);
         setFilteredProducts([]);
       } else {
@@ -156,7 +150,6 @@ const ProductCatalogManagement = () => {
           : p
       ));
 
-      console.log('Product status updated successfully');
     } catch (error) {
       console.error('Error toggling product status:', error);
     }
@@ -189,7 +182,6 @@ const ProductCatalogManagement = () => {
           : p
       ));
 
-      console.log('Auction status updated successfully');
     } catch (error) {
       console.error('Error toggling auction status:', error);
     }
@@ -225,7 +217,6 @@ const ProductCatalogManagement = () => {
 
   const handleAuctionSchedule = async (auctionData) => {
     try {
-      console.log('Scheduling auction with data:', auctionData);
 
       const updateData = {
         auction_start: auctionData.startDateTime.toISOString(),
@@ -266,7 +257,6 @@ const ProductCatalogManagement = () => {
           : product
       ));
 
-      console.log('✅ Auction scheduled successfully');
       alert('Auction scheduled successfully!');
     } catch (error) {
       console.error('Error scheduling auction:', error);
@@ -311,7 +301,6 @@ const ProductCatalogManagement = () => {
           : product
       ));
 
-      console.log('Product field updated successfully');
     } catch (error) {
       console.error('Error updating product field:', error);
     }
@@ -609,14 +598,14 @@ const ProductCatalogManagement = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
       <Header />
       <main className="pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{paddingLeft: '5rem'}}>
           <Breadcrumb />
           
           {/* Enhanced Header Section */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="flex-1">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
                   Product Catalog Management
                 </h1>
                 <p className="text-gray-600 text-lg">
