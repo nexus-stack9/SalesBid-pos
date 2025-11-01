@@ -16,6 +16,8 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
   const [playbackUrl, setPlaybackUrl] = useState('');
   const [streamStartTime, setStreamStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoHidden, setIsVideoHidden] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const webrtcStreamerRef = useRef(null);
@@ -78,49 +80,12 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     }
 
     setIsConnecting(true);
+    let stream = null;
 
     try {
-      toast.loading('Setting up live stream...', { id: 'setup' });
-      
-      // First, try to create the live stream
-      let createResponse;
-      try {
-        createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
-          productId: product.product_id,
-          productName: streamTitle || product.name
-        });
-      } catch (error) {
-        // If we get an error about existing stream, delete it and retry
-        if (error.response?.data?.error === 'Product already has an active live stream') {
-          const liveInputId = error.response.data.liveInputId;
-          toast.loading('Cleaning up existing stream...', { id: 'cleanup' });
-          
-          // Delete the existing live input
-          await axios.delete(`${API_BASE_URL}/livestream/delete/${liveInputId}`);
-          toast.dismiss('cleanup');
-          
-          // Retry creating the live stream
-          toast.loading('Setting up new live stream...', { id: 'setup' });
-          createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
-            productId: product.product_id,
-            productName: streamTitle || product.name
-          });
-        } else {
-          throw error; // Re-throw if it's a different error
-        }
-      }
-
-      if (!createResponse.data.success) {
-        throw new Error('Failed to create live stream');
-      }
-
-      const liveStreamData = createResponse.data.data;
-      setStreamData(liveStreamData);
-      setPlaybackUrl(liveStreamData.playbackUrl);
-      toast.success('Live stream created', { id: 'setup' });
-
+      // Step 1: Get camera access first (fastest to fail if denied)
       toast.loading('Accessing camera...', { id: 'camera' });
-      const stream = await getUserMediaForStreaming({
+      stream = await getUserMediaForStreaming({
         video: {
           width: { ideal: 1920 },
           height: { ideal: 1080 },
@@ -135,42 +100,52 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
       }
       toast.success('Camera ready', { id: 'camera' });
 
-      toast.loading('Connecting to stream server...', { id: 'connect' });
-      const webrtcResponse = await axios.get(
-        `${API_BASE_URL}/livestream/${product.product_id}/webrtc`
-      );
+      // Step 2: Create live stream (includes WebRTC URL in response)
+      toast.loading('Setting up stream...', { id: 'setup' });
+      
+      const createResponse = await axios.post(`${API_BASE_URL}/livestream/create`, {
+        productId: product.product_id,
+        productName: streamTitle || product.name
+      });
 
-      if (!webrtcResponse.data.success) {
-        throw new Error('Failed to get WebRTC URL');
+      if (!createResponse.data.success) {
+        throw new Error('Failed to create live stream');
       }
 
-      const webrtcUrl = webrtcResponse.data.data.webRTCUrl;
+      const liveStreamData = createResponse.data.data;
+      setStreamData(liveStreamData);
+      setPlaybackUrl(liveStreamData.playbackUrl);
+
+      // Check if WebRTC URL is available in the create response
+      const webrtcUrl = liveStreamData.webRTCUrl;
 
       if (!webrtcUrl) {
-        toast.dismiss('connect');
+        toast.dismiss('setup');
         toast.error(
           'WebRTC streaming is not available. Please use OBS or similar software with RTMP.',
           { duration: 6000 }
         );
         
-        const rtmpUrl = webrtcResponse.data.data.rtmpUrl;
-        const streamKey = webrtcResponse.data.data.streamKey;
-        
-        console.log('RTMP URL:', rtmpUrl);
-        console.log('Stream Key:', streamKey);
+        console.log('RTMP URL:', liveStreamData.rtmpUrl);
+        console.log('Stream Key:', liveStreamData.streamKey);
         
         toast.error(
-          `RTMP URL: ${rtmpUrl}\nStream Key: ${streamKey}`,
+          `RTMP URL: ${liveStreamData.rtmpUrl}\nStream Key: ${liveStreamData.streamKey}`,
           { duration: 10000 }
         );
         
         throw new Error('WebRTC not available. Use RTMP streaming with OBS or similar software.');
       }
 
+      toast.success('Stream ready', { id: 'setup' });
+
+      // Step 3: Connect to WebRTC server
+      toast.loading('Connecting...', { id: 'connect' });
       webrtcStreamerRef.current = new WebRTCStreamer();
       await webrtcStreamerRef.current.connect(webrtcUrl, stream);
-      toast.success('Connected to stream server', { id: 'connect' });
+      toast.success('Connected', { id: 'connect' });
 
+      // Step 4: Mark as live in database
       await axios.post(`${API_BASE_URL}/livestream/start`, {
         productId: product.product_id
       });
@@ -200,6 +175,10 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     } catch (error) {
       console.error('Error starting stream:', error);
       
+      // Cleanup on error
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -266,6 +245,38 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
     }
   };
 
+  const toggleAudio = () => {
+    if (!streamRef.current) return;
+
+    try {
+      const audioTrack = streamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudioMuted(!audioTrack.enabled);
+        toast.success(audioTrack.enabled ? 'Audio unmuted' : 'Audio muted');
+      }
+    } catch (error) {
+      console.error('Error toggling audio:', error);
+      toast.error('Failed to toggle audio');
+    }
+  };
+
+  const toggleVideo = () => {
+    if (!streamRef.current) return;
+
+    try {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoHidden(!videoTrack.enabled);
+        toast.success(videoTrack.enabled ? 'Video shown' : 'Video hidden');
+      }
+    } catch (error) {
+      console.error('Error toggling video:', error);
+      toast.error('Failed to toggle video');
+    }
+  };
+
   const switchCamera = async () => {
     if (!streamRef.current || !webrtcStreamerRef.current) return;
 
@@ -298,6 +309,14 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
           sender.replaceTrack(newAudioTrack);
         }
       });
+
+      // Restore mute/hide states
+      if (isAudioMuted && newAudioTrack) {
+        newAudioTrack.enabled = false;
+      }
+      if (isVideoHidden && newVideoTrack) {
+        newVideoTrack.enabled = false;
+      }
 
       toast.success('Camera switched');
     } catch (error) {
@@ -346,7 +365,7 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
         {/* Main Content */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Video Section */}
-          <div className="flex-1 bg-black relative flex items-center justify-center">
+          <div className="flex-1 bg-black relative flex items-center justify-center md:h-auto h-[70vh]">
             {/* Video element */}
             <video
               ref={videoRef}
@@ -411,12 +430,31 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
             {isStreaming && (
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/50 to-transparent">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 md:invisible">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleAudio}
+                      className="h-10 w-10 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
+                      title={isAudioMuted ? 'Unmute audio' : 'Mute audio'}
+                    >
+                      <Icon name={isAudioMuted ? "MicOff" : "Mic"} size={18} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleVideo}
+                      className="h-10 w-10 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
+                      title={isVideoHidden ? 'Show video' : 'Hide video'}
+                    >
+                      <Icon name={isVideoHidden ? "VideoOff" : "Video"} size={18} />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={switchCamera}
-                      className="h-10 w-10 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm"
+                      className="h-10 w-10 bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm md:invisible"
+                      title="Switch camera"
                     >
                       <Icon name="RefreshCw" size={18} />
                     </Button>
@@ -448,41 +486,37 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
 
           {/* Right Sidebar - Product Info & Actions */}
           {isStreaming && (
-            <div className="w-full md:w-80 md:max-w-sm bg-card border-t md:border-t-0 md:border-l border-border flex flex-col overflow-y-auto">
+            <div className="w-full md:w-80 md:max-w-sm bg-card border-t md:border-t-0 md:border-l border-border flex flex-col overflow-y-auto max-h-[30vh] md:max-h-none">
               {/* Product Details */}
-              <div className="p-4 space-y-4">
-                <div className="flex items-start space-x-3">
+              <div className="p-3 md:p-4 space-y-2 md:space-y-4">
+                <div className="flex items-start space-x-2 md:space-x-3">
                   <img
                     src={product?.image_path}
                     alt={product?.name}
-                    className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-border"
+                    className="hidden md:block w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-border"
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-foreground text-sm mb-1 line-clamp-2">{product?.name}</h4>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Starting</span>
-                        <span className="font-medium text-foreground">₹{product?.starting_price}</span>
-                      </div>
-                      {product?.bid_amount && (
-                        <div className="flex items-center justify-between text-xs">
+                    <h4 className="font-semibold text-foreground text-xs md:text-sm mb-0.5 md:mb-1 line-clamp-2">{product?.name}</h4>
+                    {product?.bid_amount && (
+                      <div className="space-y-0.5 md:space-y-1">
+                        <div className="flex items-center justify-between text-[10px] md:text-xs">
                           <span className="text-muted-foreground">Current Bid</span>
                           <span className="font-semibold text-green-500">₹{product?.bid_amount}</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Current Bid Highlight */}
                 {product?.bid_amount && (
-                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <div className="p-2 md:p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-green-600 dark:text-green-400 font-medium mb-1">Current Highest Bid</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">₹{product?.bid_amount}</p>
+                        <p className="text-[10px] md:text-xs text-green-600 dark:text-green-400 font-medium mb-0.5 md:mb-1">Current Highest Bid</p>
+                        <p className="text-lg md:text-2xl font-bold text-green-600 dark:text-green-400">₹{product?.bid_amount}</p>
                       </div>
-                      <Icon name="TrendingUp" size={32} className="text-green-500/50" />
+                      <Icon name="TrendingUp" size={20} className="text-green-500/50 md:w-8 md:h-8" />
                     </div>
                   </div>
                 )}
@@ -490,24 +524,24 @@ const GoLiveModal = ({ isOpen, onClose, product, onGoLive }) => {
                 {/* End Stream Button */}
                 <Button
                   onClick={stopStream}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 transition-all"
+                  className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 md:py-3 text-sm md:text-base transition-all"
                 >
-                  <Icon name="StopCircle" size={18} className="mr-2" />
+                  <Icon name="StopCircle" size={16} className="mr-1.5 md:mr-2" />
                   End Live Stream
                 </Button>
 
                 {/* Stream Info */}
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Stream Details</p>
-                  <div className="space-y-2">
-                    <div className="flex items-start space-x-2">
-                      <Icon name="Radio" size={14} className="text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-foreground line-clamp-1">{streamTitle}</p>
+                <div className="pt-2 md:pt-3 border-t border-border">
+                  <p className="text-[10px] md:text-xs text-muted-foreground mb-1 md:mb-2">Stream Details</p>
+                  <div className="space-y-1 md:space-y-2">
+                    <div className="flex items-start space-x-1.5 md:space-x-2">
+                      <Icon name="Radio" size={12} className="text-muted-foreground mt-0.5 flex-shrink-0 md:w-3.5 md:h-3.5" />
+                      <p className="text-[10px] md:text-xs text-foreground line-clamp-1">{streamTitle}</p>
                     </div>
                     {streamDescription && (
-                      <div className="flex items-start space-x-2">
-                        <Icon name="FileText" size={14} className="text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-muted-foreground line-clamp-2">{streamDescription}</p>
+                      <div className="flex items-start space-x-1.5 md:space-x-2">
+                        <Icon name="FileText" size={12} className="text-muted-foreground mt-0.5 flex-shrink-0 md:w-3.5 md:h-3.5" />
+                        <p className="text-[10px] md:text-xs text-muted-foreground line-clamp-2">{streamDescription}</p>
                       </div>
                     )}
                   </div>
