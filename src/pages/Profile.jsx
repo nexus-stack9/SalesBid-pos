@@ -259,7 +259,7 @@ const Profile = () => {
   const stats = [
     { label: 'Total Products', value: '156', icon: 'Package', color: 'text-blue-600 bg-blue-50' },
     { label: 'Total Orders', value: '1,234', icon: 'ShoppingCart', color: 'text-green-600 bg-green-50' },
-    { label: 'Revenue', value: '$45,678', icon: 'DollarSign', color: 'text-purple-600 bg-purple-50' },
+    { label: 'Revenue', value: '45,678', icon: 'IndianRupee', color: 'text-purple-600 bg-purple-50' },
     // { label: 'Rating', value: '4.8/5.0', icon: 'Star', color: 'text-yellow-600 bg-yellow-50' },
   ];
 
