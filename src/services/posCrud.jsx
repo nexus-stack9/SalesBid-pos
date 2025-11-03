@@ -29,6 +29,18 @@ export const getAllProductsByVendorId = async (vendorId) => {
   }
 };
 
+export const getVendorById = async (vendorId) => {
+  try {
+    const url = `${API_BASE_URL}/pos/getVendorById/${vendorId}`;
+
+    const response = await axios.get(url);
+    return response;
+  } catch (error) {
+    
+    throw error;
+  }
+};
+
 export const getAllmatrixByVendorId = async (vendorId) => {
   try {
     const url = `${API_BASE_URL}/pos/getAllmatrixByVendorId/${vendorId}`;

@@ -40,7 +40,6 @@ const ProductCatalogManagement = () => {
     setError(null);
     try {
       const userData = getUserData();
-     
       
       if (!userData?.vendorId) {
         setError("Vendor ID not found");
@@ -51,8 +50,6 @@ const ProductCatalogManagement = () => {
       }
 
       const response = await getAllProductsByVendorId(userData.vendorId);
-      
-      
       
       if (response?.data && Array.isArray(response.data)) {
         setProducts(response.data);
@@ -217,7 +214,6 @@ const ProductCatalogManagement = () => {
 
   const handleAuctionSchedule = async (auctionData) => {
     try {
-
       const updateData = {
         auction_start: auctionData.startDateTime.toISOString(),
         auction_end: auctionData.endDateTime.toISOString(),
@@ -428,6 +424,11 @@ const ProductCatalogManagement = () => {
 
   const handleEditSave = async (productData) => {
     try {
+      const productId = editingProduct.product_id;
+      const vendorId = getUserData()?.vendorId;
+      const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
+
+      // Step 1: Update product basic data
       const updateData = {
         product_name: productData.name,
         product_description: productData.description,
@@ -451,39 +452,81 @@ const ProductCatalogManagement = () => {
         is_active: productData.isactive,
         product_status: productData.status,
         auction_status: productData.auctionstatus,
-        created_by: getUserData()?.email,
-        seller_id: getUserData()?.vendorId,
         auctionstatus: productData.auctionstatus,
-        vendor_email: getUserData()?.email,
-        vendor_id: getUserData()?.vendorId,
       };
 
-      const result = await updatedata('productForm', editingProduct.product_id, updateData);
+      const result = await updatedata('productForm', productId, updateData);
       if (!result.success) {
         alert('Failed to update product. Please try again.');
         return false;
       }
 
+      // Step 2: Prepare file paths object
+      const filePaths = {};
+
+      // Step 3: Upload and update images if present
       if (productData.imageFiles && productData.imageFiles.length > 0) {
-        const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
-        const vendorId = getUserData()?.vendorId;
-        const uploadPath = `${vendorId}/Products/${editingProduct?.product_id}`;
+        const imageUploadPath = `${vendorId}/Products/${productId}`;
         
         try {
-          const uploadRes = await uploadMultipleFiles(productData.imageFiles, uploadPath);
+          const uploadRes = await uploadMultipleFiles(productData.imageFiles, imageUploadPath);
           
           if (uploadRes.success) {
-            const allImagePaths = productData.imageFiles.map((file) => {
-              return `${filePathPrefix}/${uploadPath}/${file.name}`;
+            const imagePaths = productData.imageFiles.map((file) => {
+              return `${filePathPrefix}/${imageUploadPath}/${file.name}`;
             }).join(',');
             
-            await updatedata('productForm', editingProduct.product_id, { image_path: allImagePaths });
+            filePaths.image_path = imagePaths;
           }
         } catch (uploadError) {
           console.error('Error during image upload:', uploadError);
         }
       }
 
+      // Step 4: Upload and update videos if present
+      if (productData.videoFiles && productData.videoFiles.length > 0) {
+        const videoUploadPath = `${vendorId}/Products/${productId}/videos`;
+        
+        try {
+          const uploadRes = await uploadMultipleFiles(productData.videoFiles, videoUploadPath);
+          
+          if (uploadRes.success) {
+            const videoPaths = productData.videoFiles.map((file) => {
+              return `${filePathPrefix}/${videoUploadPath}/${file.name}`;
+            }).join(',');
+            
+            filePaths.video_path = videoPaths;
+          }
+        } catch (uploadError) {
+          console.error('Error during video upload:', uploadError);
+        }
+      }
+
+      // Step 5: Upload and update documents if present
+      if (productData.documentFiles && productData.documentFiles.length > 0) {
+        const docUploadPath = `${vendorId}/Products/${productId}/documents`;
+        
+        try {
+          const uploadRes = await uploadMultipleFiles(productData.documentFiles, docUploadPath);
+          
+          if (uploadRes.success) {
+            const docPaths = productData.documentFiles.map((file) => {
+              return `${filePathPrefix}/${docUploadPath}/${file.name}`;
+            }).join(',');
+            
+            filePaths.manifest_url = docPaths;
+          }
+        } catch (uploadError) {
+          console.error('Error during document upload:', uploadError);
+        }
+      }
+
+      // Step 6: Update product with all file paths in one call
+      if (Object.keys(filePaths).length > 0) {
+        await updatedata('productForm', productId, filePaths);
+      }
+
+      // Step 7: Refresh product list
       await fetchAllProducts();
       setIsEditModalOpen(false);
       setEditingProduct(null);
@@ -500,6 +543,10 @@ const ProductCatalogManagement = () => {
 
   const handleSaveProduct = async (productData) => {
     try {
+      const vendorId = getUserData()?.vendorId;
+      const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
+
+      // Step 1: Create product with basic data first
       const productFormData = {
         name: productData.name,
         description: productData.description,
@@ -528,7 +575,9 @@ const ProductCatalogManagement = () => {
         vendor_email: getUserData()?.email,
         vendor_id: getUserData()?.vendorId,
         currentBid: null,
-        image_path: ''
+        image_path: '',
+        video_path: '',
+        manifest_url: ''
       };
       
       const result = await insertRecord('productForm', productFormData);
@@ -539,40 +588,87 @@ const ProductCatalogManagement = () => {
       }
       
       const productId = result.id;
-      const vendorId = getUserData()?.vendorId;
-      
-      let allImagePaths = '';
-      
+      console.log('✅ Product created with ID:', productId);
+
+      // Step 2: Prepare file paths object
+      const filePaths = {};
+
+      // Step 3: Upload images if present
       if (productData.imageFiles && productData.imageFiles.length > 0) {
-        const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
-        const uploadPath = `${vendorId}/Products/${productId}`;
+        const imageUploadPath = `${vendorId}/Products/${productId}`;
         
+        console.log('📤 Uploading images to:', imageUploadPath);
         try {
-          const uploadRes = await uploadMultipleFiles(productData.imageFiles, uploadPath);
+          const uploadRes = await uploadMultipleFiles(productData.imageFiles, imageUploadPath);
           
           if (uploadRes.success) {
-            allImagePaths = productData.imageFiles.map((file) => {
-              return `${filePathPrefix}/${uploadPath}/${file.name}`;
+            const imagePaths = productData.imageFiles.map((file) => {
+              return `${filePathPrefix}/${imageUploadPath}/${file.name}`;
             }).join(',');
-
-            await updatedata('productForm', productId, { image_path: allImagePaths });
+            
+            filePaths.image_path = imagePaths;
+            console.log('✅ Images uploaded. Paths:', imagePaths);
           }
         } catch (uploadError) {
-          console.error('Error during image upload:', uploadError);
-        }
-      } 
-      
-      if (productData.videoFiles && productData.videoFiles.length > 0) {
-        const filePathPrefix = "https://pub-a9806e1f673d447a94314a6d53e85114.r2.dev";
-        const uploadPath = `${vendorId}/Products/${productId}/videos`;
-        
-        try {
-          await uploadMultipleFiles(productData.videoFiles, uploadPath);
-        } catch (uploadError) {
-          console.error('Error during video upload:', uploadError);
+          console.error('❌ Error during image upload:', uploadError);
         }
       }
       
+      // Step 4: Upload videos if present
+      if (productData.videoFiles && productData.videoFiles.length > 0) {
+        const videoUploadPath = `${vendorId}/Products/${productId}/videos`;
+        
+        console.log('📤 Uploading videos to:', videoUploadPath);
+        try {
+          const uploadRes = await uploadMultipleFiles(productData.videoFiles, videoUploadPath);
+          
+          if (uploadRes.success) {
+            const videoPaths = productData.videoFiles.map((file) => {
+              return `${filePathPrefix}/${videoUploadPath}/${file.name}`;
+            }).join(',');
+            
+            filePaths.video_path = videoPaths;
+            console.log('✅ Videos uploaded. Paths:', videoPaths);
+          }
+        } catch (uploadError) {
+          console.error('❌ Error during video upload:', uploadError);
+        }
+      }
+      
+      // Step 5: Upload documents if present
+      if (productData.documentFiles && productData.documentFiles.length > 0) {
+        const docUploadPath = `${vendorId}/Products/${productId}/documents`;
+        
+        console.log('📤 Uploading documents to:', docUploadPath);
+        try {
+          const uploadRes = await uploadMultipleFiles(productData.documentFiles, docUploadPath);
+          
+          if (uploadRes.success) {
+            const docPaths = productData.documentFiles.map((file) => {
+              return `${filePathPrefix}/${docUploadPath}/${file.name}`;
+            }).join(',');
+            
+            filePaths.manifest_url = docPaths;
+            console.log('✅ Documents uploaded. Paths:', docPaths);
+          }
+        } catch (uploadError) {
+          console.error('❌ Error during document upload:', uploadError);
+        }
+      }
+
+      // Step 6: Update product with all file paths in one call
+      if (Object.keys(filePaths).length > 0) {
+        console.log('📝 Updating product with file paths:', filePaths);
+        const updateResult = await updatedata('productForm', productId, filePaths);
+        
+        if (updateResult.success) {
+          console.log('✅ Product updated with file paths successfully');
+        } else {
+          console.error('❌ Failed to update product with file paths');
+        }
+      }
+      
+      // Step 7: Refresh product list and close modal
       await fetchAllProducts();
       setIsUploadModalOpen(false);
       alert('Product added successfully!');
@@ -580,7 +676,7 @@ const ProductCatalogManagement = () => {
       return true;
       
     } catch (error) {
-      console.error('Error saving product:', error);
+      console.error('❌ Error saving product:', error);
       alert('Error saving product. Please try again.');
       return false;
     }
@@ -611,29 +707,6 @@ const ProductCatalogManagement = () => {
                 <p className="text-gray-600 text-lg">
                   Manage product listings, auction controls, and inventory
                 </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {/* <button
-                  onClick={fetchAllProducts}
-                  className="px-5 py-2.5 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm font-medium"
-                >
-                  <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-                  Refresh
-                </button>
-                <button
-                  onClick={handleExport}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 font-medium"
-                >
-                  <Download size={18} />
-                  Export
-                </button>
-                <button
-                  onClick={handleAddProduct}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30 font-medium"
-                >
-                  <Plus size={18} />
-                  Add Product
-                </button> */}
               </div>
             </div>
           </div>

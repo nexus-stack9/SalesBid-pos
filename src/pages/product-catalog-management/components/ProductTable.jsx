@@ -45,18 +45,18 @@ const ProductTable = ({
     // Handle comma-separated paths
     if (imagePath.includes(',')) {
       const imageUrls = imagePath.split(',').map(url => url.trim()).filter(url => url);
-      console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
+      // console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
       return imageUrls[0] || null;
     }
 
-    console.log(`Product "${product?.name}" image URL:`, imagePath);
+    // console.log(`Product "${product?.name}" image URL:`, imagePath);
     return imagePath;
   };
 
   // Parse product images from comma-separated image_path string
   const getProductImages = (product) => {
     if (!product?.image_path) {
-      console.log('No image_path found for product:', product?.name);
+      // console.log('No image_path found for product:', product?.name);
       return [];
     }
 
@@ -69,7 +69,7 @@ const ProductTable = ({
       .map(url => url.trim())
       .filter(url => url); // Remove empty strings
 
-    console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
+    // console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
 
     // Return array of image objects for the gallery
     return imageUrls.map((url, index) => ({
@@ -80,13 +80,13 @@ const ProductTable = ({
 
   // Handle image load error
   const handleImageError = (productId) => {
-    console.error(`Failed to load image for product ID: ${productId}`);
+    // console.error(`Failed to load image for product ID: ${productId}`);
     setImageErrors(prev => ({ ...prev, [productId]: true }));
   };
 
   // Handle image load success
   const handleImageLoad = (productId) => {
-    console.log(`Successfully loaded image for product ID: ${productId}`);
+    // console.log(`Successfully loaded image for product ID: ${productId}`);
     setImageErrors(prev => ({ ...prev, [productId]: false }));
   };
 
@@ -107,14 +107,14 @@ const ProductTable = ({
         updateData.auction_end = editValue;
       }
 
-      console.log(`Saving ${field} for product ${productId}:`, updateData);
+      // console.log(`Saving ${field} for product ${productId}:`, updateData);
       onCellValueUpdate(productId, field, editValue);
 
       setEditingCell(null);
       setEditValue('');
-      console.log('Cell value saved successfully');
+      // console.log('Cell value saved successfully');
     } catch (error) {
-      console.error('Error saving cell value:', error);
+      // console.error('Error saving cell value:', error);
       alert('Failed to save changes. Please try again.');
     }
   };
@@ -126,7 +126,7 @@ const ProductTable = ({
 
   const handleViewImages = (product) => {
     const images = getProductImages(product);
-    console.log('Opening gallery with images:', images);
+    // console.log('Opening gallery with images:', images);
     setImageGalleryModal({ isOpen: true, product });
   };
 
@@ -143,7 +143,7 @@ const ProductTable = ({
   };
 
   const handleAuctionScheduled = async (auctionData) => {
-    console.log('Auction scheduled:', auctionData);
+    // console.log('Auction scheduled:', auctionData);
     if (onAuctionSchedule) {
       await onAuctionSchedule(auctionData);
     }
@@ -151,7 +151,7 @@ const ProductTable = ({
   };
 
   const handleLiveStreamStart = (liveData) => {
-    console.log('Live stream started:', liveData);
+    // console.log('Live stream started:', liveData);
     // Update product status to live
     // Make API call to start live stream
   };
@@ -206,13 +206,13 @@ const ProductTable = ({
     };
 
     // Debug logging
-    React.useEffect(() => {
-      console.log(`ProductImage render for "${product?.name}":`, {
-        imageUrl,
-        hasError,
-        image_path: product?.image_path
-      });
-    }, [imageUrl, hasError, product]);
+    // React.useEffect(() => {
+    //   console.log(`ProductImage render for "${product?.name}":`, {
+    //     imageUrl,
+    //     hasError,
+    //     image_path: product?.image_path
+    //   });
+    // }, [imageUrl, hasError, product]);
 
     return (
       <div className={`${sizeClasses[size]} rounded-lg overflow-hidden bg-muted flex-shrink-0`}>
