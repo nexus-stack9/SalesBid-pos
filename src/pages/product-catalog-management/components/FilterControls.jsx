@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Cookies from 'js-cookie';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -13,6 +14,61 @@ const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Decode JWT token
+  const decodeJWT = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // Get user data from token
+  const getUserData = () => {
+    const token = 
+      Cookies.get('authToken') || 
+      Cookies.get('accessToken') || 
+      localStorage.getItem('authToken');
+
+    if (token) {
+      const decoded = decodeJWT(token);
+      if (decoded) {
+        return {
+          vendorId: decoded.vendorId || decoded.userId,
+          email: decoded.email,
+          role: decoded.role,
+          name: decoded.name,
+          avatar: decoded.avatar,
+        };
+      }
+    }
+
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
+      try {
+        return JSON.parse(cachedUser);
+      } catch (error) {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // Check if user is admin on component mount
+  useEffect(() => {
+    const userData = getUserData();
+    setIsAdmin(userData?.role?.toLowerCase() === 'salesbidadmin');
+  }, []);
 
   const categories = [
     { value: '', label: 'All Categories' },
@@ -131,7 +187,7 @@ const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
       </div>
 
       {/* Quick Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isAdmin ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-4 mb-4`}>
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Category</label>
           <select
@@ -147,20 +203,22 @@ const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Vendor</label>
-          <select
-            value={filters?.vendor}
-            onChange={(e) => handleFilterChange('vendor', e?.target?.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {vendors?.map(option => (
-              <option key={option?.value} value={option?.value}>
-                {option?.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {isAdmin && (
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Vendor</label>
+            <select
+              value={filters?.vendor}
+              onChange={(e) => handleFilterChange('vendor', e?.target?.value)}
+              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {vendors?.map(option => (
+                <option key={option?.value} value={option?.value}>
+                  {option?.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">Auction Status</label>
@@ -260,6 +318,9 @@ const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
           <span className="text-sm text-muted-foreground">Active filters:</span>
           {Object.entries(filters)?.map(([key, value]) => {
             if (!value) return null;
+            // Skip vendor filter display if not admin
+            if (key === 'vendor' && !isAdmin) return null;
+            
             const label = key?.charAt(0)?.toUpperCase() + key?.slice(1);
             return (
               <span

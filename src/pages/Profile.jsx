@@ -613,7 +613,7 @@ const Profile = () => {
                       </div>
                     </div>
 
-                    <div className="pt-6 border-t border-border">
+                    {/* <div className="pt-6 border-t border-border">
                       <h3 className="text-lg font-semibold text-foreground mb-4">Social Links</h3>
                       
                       <div className="space-y-4">
@@ -689,7 +689,7 @@ const Profile = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 )}
 

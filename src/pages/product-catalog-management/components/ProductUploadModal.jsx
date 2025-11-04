@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { debounce } from 'lodash';
+import React, { useState, useCallback, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -180,17 +179,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     };
   }, [isOpen]);
 
-  // Debounced handler for number inputs
-  const debouncedNumberChange = useMemo(
-    () => debounce((name, value) => {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }, 300),
-    []
-  );
-
+  // Simple input change handler - no debouncing needed
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -198,14 +187,10 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
     
-    if (type === 'number') {
-      debouncedNumberChange(name, value);
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
   
   // Image drag and drop handlers
@@ -596,9 +581,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       };
       
       await onSave(productData);
-      handleClose();
     } catch (error) {
-      console.error('Failed to save product:', error);
       setErrors({ submit: `Failed to ${isEditMode ? 'update' : 'save'} product. Please try again.` });
     } finally {
       setIsSaving(false);

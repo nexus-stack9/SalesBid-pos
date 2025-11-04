@@ -60,7 +60,6 @@ const Sidebar = () => {
       );
       return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('Error decoding JWT:', error);
       return null;
     }
   };
@@ -92,42 +91,60 @@ const Sidebar = () => {
       try {
         return JSON.parse(cachedUser);
       } catch (error) {
-        console.error('Error parsing cached user data:', error);
+        return null;
       }
     }
     return null;
   };
 
   const userData = getUserData();
+  const isAdmin = userData?.role?.toLowerCase() === 'salesbidadmin';
 
   // Fetch counts
   useEffect(() => {
     const fetchCounts = async () => {
       setIsLoading(true);
       try {
-        const [vendorsResponse, productsResponse] = await Promise.all([
-          getAllVendors(),
-          userData?.vendorId ? getAllProductsByVendorId(userData.vendorId) : Promise.resolve({ data: [] })
-        ]);
+        const promises = [];
 
-        setVendorCount(vendorsResponse?.data?.length || 0);
-        setProductCount(productsResponse?.data?.length || 0);
+        // Only fetch vendors if user is admin
+        if (isAdmin) {
+          promises.push(getAllVendors());
+        }
+
+        // Fetch products
+        if (userData?.vendorId) {
+          promises.push(getAllProductsByVendorId(userData.vendorId));
+        } else {
+          promises.push(Promise.resolve({ data: [] }));
+        }
+
+        const results = await Promise.all(promises);
+
+        if (isAdmin) {
+          setVendorCount(results[0]?.data?.length || 0);
+          setProductCount(results[1]?.data?.length || 0);
+        } else {
+          setProductCount(results[0]?.data?.length || 0);
+        }
       } catch (error) {
-        console.error('Error fetching counts:', error);
+        // Error handling - counts will remain at 0
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCounts();
-  }, [userData?.vendorId]);
+  }, [userData?.vendorId, isAdmin]);
 
-  const navigationItems = [
+  // Define all navigation items
+  const allNavigationItems = [
     {
       label: 'Dashboard',
       path: '/vendor-analytics',
       icon: 'LayoutDashboard',
       subPaths: ['/document-verification-center'],
+      adminOnly: false,
     },
     {
       label: 'Vendors',
@@ -135,20 +152,31 @@ const Sidebar = () => {
       icon: 'Users',
       badge: vendorCount,
       subPaths: ['/document-verification-center'],
+      adminOnly: true, // Only visible to admin
     },
     {
       label: 'Products',
       path: '/product-catalog-management',
       icon: 'Package',
       badge: productCount,
+      adminOnly: false,
     },
     {
       label: 'Orders',
       path: '/order-management-system',
       icon: 'ShoppingCart',
       badge: 8,
+      adminOnly: false,
     },
   ];
+
+  // Filter navigation items based on user role
+  const navigationItems = allNavigationItems.filter(item => {
+    if (item.adminOnly) {
+      return isAdmin;
+    }
+    return true;
+  });
 
   const isActiveRoute = (item) => {
     return (
@@ -311,7 +339,7 @@ const Sidebar = () => {
                 <p className="text-sm font-semibold text-foreground truncate">
                   {userData?.name || 'User'}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground truncate capitalize">
                   {userData?.role || 'Vendor'}
                 </p>
               </div>
@@ -393,7 +421,7 @@ const Sidebar = () => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-40 bg-card/95 backdrop-blur-xl border-border/50">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-64 bg-card/95 backdrop-blur-xl border-r border-border/50">
         <SidebarContent />
       </aside>
 
@@ -452,7 +480,7 @@ const Sidebar = () => {
       </aside>
 
       {/* Spacer for desktop */}
-      <div className="hidden lg:block w-60" />
+      <div className="hidden lg:block w-64" />
 
       {/* Spacer for mobile */}
       <div className="lg:hidden h-16" />

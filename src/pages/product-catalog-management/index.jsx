@@ -128,7 +128,7 @@ const ProductCatalogManagement = () => {
       const newStatus = !product.isactive;
       
       const result = await updatedata('productForm', productId, {
-        is_active: newStatus
+        isactive: newStatus
       });
 
       if (!result.success) {
