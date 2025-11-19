@@ -9,6 +9,8 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     name: '',
     description: '',
     category_id: '',
+    subcategory_id: '',
+    brand_name: '',
     vendor_id: '',
     starting_price: '',
     retail_value: '',
@@ -17,35 +19,56 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     location: '',
     shipping: '',
     quantity: '',
+    quantity_unit: 'units',
     condition: '',
-    tags: '',
-    buy_option: 0,
+    tags: [],
+    listing_type: 'auction', // 'auction', 'direct_buy', 'both'
     sale_price: '',
     weight: '',
     height: '',
     length: '',
     breadth: '',
+    // Shipping fields
+    product_location_pin: '',
+    product_city: '',
+    product_state: '',
+    gross_weight: '',
+    num_boxes: '',
+    packaging_type: '',
+    // Box dimensions
+    box_height: '',
+    box_length: '',
+    box_breadth: '',
     trending: false,
-    isactive: true
+    isactive: true,
+    seller_declaration: false
   });
   
   const [images, setImages] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [existingVideos, setExistingVideos] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [manifest, setManifest] = useState(null);
+  const [existingManifest, setExistingManifest] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [dragActiveVideo, setDragActiveVideo] = useState(false);
   const [dragActiveDoc, setDragActiveDoc] = useState(false);
+  const [dragActiveManifest, setDragActiveManifest] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [errors, setErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [imageErrors, setImageErrors] = useState([]);
   const [videoErrors, setVideoErrors] = useState([]);
   const [documentErrors, setDocumentErrors] = useState([]);
+  const [manifestErrors, setManifestErrors] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
 
   const steps = [
     { id: 0, name: 'Product Info', icon: 'Package' },
     { id: 1, name: 'Pricing & Auction', icon: 'IndianRupee' },
-    { id: 2, name: 'Shipping & Manifest', icon: 'Truck' },
+    { id: 2, name: 'Shipping & Pickup', icon: 'Truck' },
     { id: 3, name: 'Media & Publish', icon: 'Image' }
   ];
 
@@ -57,6 +80,82 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     { value: 5, label: 'Books' },
     { value: 6, label: 'Automotive' }
   ];
+
+  // Subcategories mapped to main categories
+  const subcategoriesMap = {
+    1: [ // Electronics
+      { value: 101, label: 'Laptops' },
+      { value: 102, label: 'Mobile Phones' },
+      { value: 103, label: 'Tablets' },
+      { value: 104, label: 'Cameras' },
+      { value: 105, label: 'Audio & Headphones' },
+      { value: 106, label: 'Televisions' },
+      { value: 107, label: 'Computer Accessories' },
+      { value: 108, label: 'Smart Watches' },
+      { value: 109, label: 'Gaming Consoles' },
+      { value: 110, label: 'Other Electronics' }
+    ],
+    2: [ // Fashion
+      { value: 201, label: 'Men\'s Clothing' },
+      { value: 202, label: 'Women\'s Clothing' },
+      { value: 203, label: 'Kids Clothing' },
+      { value: 204, label: 'Footwear' },
+      { value: 205, label: 'Watches' },
+      { value: 206, label: 'Bags & Luggage' },
+      { value: 207, label: 'Jewelry' },
+      { value: 208, label: 'Sunglasses' },
+      { value: 209, label: 'Accessories' },
+      { value: 210, label: 'Other Fashion' }
+    ],
+    3: [ // Home & Garden
+      { value: 301, label: 'Furniture' },
+      { value: 302, label: 'Kitchen Appliances' },
+      { value: 303, label: 'Home Decor' },
+      { value: 304, label: 'Bedding & Bath' },
+      { value: 305, label: 'Garden Tools' },
+      { value: 306, label: 'Lighting' },
+      { value: 307, label: 'Storage & Organization' },
+      { value: 308, label: 'Cleaning Supplies' },
+      { value: 309, label: 'Plants & Seeds' },
+      { value: 310, label: 'Other Home & Garden' }
+    ],
+    4: [ // Sports & Outdoors
+      { value: 401, label: 'Fitness Equipment' },
+      { value: 402, label: 'Cycling' },
+      { value: 403, label: 'Camping & Hiking' },
+      { value: 404, label: 'Team Sports' },
+      { value: 405, label: 'Water Sports' },
+      { value: 406, label: 'Winter Sports' },
+      { value: 407, label: 'Golf' },
+      { value: 408, label: 'Tennis & Badminton' },
+      { value: 409, label: 'Sportswear' },
+      { value: 410, label: 'Other Sports' }
+    ],
+    5: [ // Books
+      { value: 501, label: 'Fiction' },
+      { value: 502, label: 'Non-Fiction' },
+      { value: 503, label: 'Academic & Professional' },
+      { value: 504, label: 'Children\'s Books' },
+      { value: 505, label: 'Comics & Graphic Novels' },
+      { value: 506, label: 'Magazines' },
+      { value: 507, label: 'eBooks' },
+      { value: 508, label: 'Audiobooks' },
+      { value: 509, label: 'Rare & Collectible' },
+      { value: 510, label: 'Other Books' }
+    ],
+    6: [ // Automotive
+      { value: 601, label: 'Car Accessories' },
+      { value: 602, label: 'Motorcycle Accessories' },
+      { value: 603, label: 'Car Electronics' },
+      { value: 604, label: 'Tires & Wheels' },
+      { value: 605, label: 'Car Care' },
+      { value: 606, label: 'Tools & Equipment' },
+      { value: 607, label: 'Replacement Parts' },
+      { value: 608, label: 'Interior Accessories' },
+      { value: 609, label: 'Exterior Accessories' },
+      { value: 610, label: 'Other Automotive' }
+    ]
+  };
 
   const vendors = [
     { value: 1, label: 'TechMart Solutions' },
@@ -74,39 +173,188 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     { value: 'acceptable', label: 'Acceptable' }
   ];
 
-  const shippingOptions = [
-    { value: 'free', label: 'Free Shipping' },
-    { value: 'standard', label: 'Standard Shipping' },
-    { value: 'express', label: 'Express Shipping' },
-    { value: 'pickup', label: 'Local Pickup Only' }
+  const quantityUnits = [
+    { value: 'units', label: 'Units' },
+    { value: 'boxes', label: 'Boxes' },
+    { value: 'bags', label: 'Bags' },
+    { value: 'pallets', label: 'Pallets' },
+    { value: 'plates', label: 'Plates' },
+    { value: 'truckloads', label: 'Truckloads' },
+    { value: 'sets', label: 'Sets' }
   ];
+
+  const listingTypes = [
+    { value: 'auction', label: 'Auction' },
+    { value: 'direct_buy', label: 'Direct Buy' },
+    { value: 'both', label: 'Both' }
+  ];
+
+  const packagingTypes = [
+    { value: 'loose', label: 'Loose' },
+    { value: 'box', label: 'Box' },
+    { value: 'bag', label: 'Bag' },
+    { value: 'crate', label: 'Crate' },
+    { value: 'drum', label: 'Drum' },
+    { value: 'bale', label: 'Bale' },
+    { value: 'pallet', label: 'Pallet' },
+    { value: 'plate', label: 'Plate' },
+    { value: 'truckload', label: 'Truckload' },
+    { value: 'other', label: 'Other' }
+  ];
+
+  // Get available subcategories based on selected category
+  const getAvailableSubcategories = () => {
+    if (!formData.category_id) return [];
+    return subcategoriesMap[formData.category_id] || [];
+  };
+
+  // PIN code lookup using Indian Postal API
+  const lookupPinCode = async (pin) => {
+    if (pin && pin.length === 6 && /^\d+$/.test(pin)) {
+      setPinLoading(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+        const data = await response.json();
+        
+        if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+          const postOffice = data[0].PostOffice[0];
+          return {
+            city: postOffice.District || postOffice.Block || '',
+            state: postOffice.State || ''
+          };
+        }
+      } catch (error) {
+        console.error('PIN lookup error:', error);
+        return null;
+      } finally {
+        setPinLoading(false);
+      }
+    }
+    return null;
+  };
+
+  // Helper function to convert date to datetime-local format
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      // Format to YYYY-MM-DDTHH:mm for datetime-local input
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
+  };
 
   // Initialize form data when in edit mode
   useEffect(() => {
     if (initialData && isEditMode && isOpen) {
+      // Parse tags from string or array
+      let tagsArray = [];
+      if (initialData.tags) {
+        if (typeof initialData.tags === 'string') {
+          tagsArray = initialData.tags.split(',').map(t => t.trim()).filter(t => t);
+        } else if (Array.isArray(initialData.tags)) {
+          tagsArray = initialData.tags;
+        }
+      }
+
+      // Determine listing type from buy_option
+      let listingType = 'auction';
+      if (initialData.buy_option === 1) {
+        listingType = 'direct_buy';
+      } else if (initialData.buy_option === 2) {
+        listingType = 'both';
+      }
+
       setFormData({
         name: initialData.name || '',
         description: initialData.description || '',
         category_id: initialData.category_id || '',
+        subcategory_id: initialData.subcategory_id || '',
+        brand_name: initialData.brand_name || '',
         vendor_id: initialData.vendor_id || '',
         starting_price: initialData.starting_price || '',
         retail_value: initialData.retail_value || '',
-        auction_start: initialData.auction_start || '',
-        auction_end: initialData.auction_end || '',
+        auction_start: formatDateForInput(initialData.auction_start),
+        auction_end: formatDateForInput(initialData.auction_end),
         location: initialData.location || '',
         shipping: initialData.shipping || '',
         quantity: initialData.quantity || '',
+        quantity_unit: initialData.quantity_unit || 'units',
         condition: initialData.condition || '',
-        tags: initialData.tags || '',
-        buy_option: initialData.buy_option || 0,
+        tags: tagsArray,
+        listing_type: listingType,
         sale_price: initialData.sale_price || '',
         weight: initialData.weight || '',
         height: initialData.height || '',
         length: initialData.length || '',
         breadth: initialData.breadth || '',
+        // Shipping fields
+        product_location_pin: initialData.product_location_pin || initialData.location || '',
+        product_city: initialData.product_city || '',
+        product_state: initialData.product_state || '',
+        gross_weight: initialData.gross_weight || initialData.weight || '',
+        num_boxes: initialData.num_boxes || '',
+        packaging_type: initialData.packaging_type || '',
+        box_height: initialData.box_height || '',
+        box_length: initialData.box_length || '',
+        box_breadth: initialData.box_breadth || '',
         trending: initialData.trending || false,
-        isactive: initialData.isactive !== undefined ? initialData.isactive : true
+        isactive: initialData.isactive !== undefined ? initialData.isactive : true,
+        seller_declaration: false
       });
+
+      // Load existing images from image_path
+      if (initialData.image_path) {
+        const imagePaths = initialData.image_path.includes(',') 
+          ? initialData.image_path.split(',').map(path => path.trim())
+          : [initialData.image_path];
+        
+        const existingImgs = imagePaths.map((path, index) => ({
+          id: `existing-${index}-${Date.now()}`,
+          preview: path,
+          name: `Image ${index + 1}`,
+          isExisting: true,
+          url: path
+        }));
+        setExistingImages(existingImgs);
+      }
+
+      // Load existing videos from video_path
+      if (initialData.video_path) {
+        const videoPaths = initialData.video_path.includes(',') 
+          ? initialData.video_path.split(',').map(path => path.trim())
+          : [initialData.video_path];
+        
+        const existingVids = videoPaths.map((path, index) => ({
+          id: `existing-video-${index}-${Date.now()}`,
+          name: `Video ${index + 1}`,
+          url: path,
+          isExisting: true
+        }));
+        setExistingVideos(existingVids);
+      }
+
+      // Load existing manifest from manifest_url
+      if (initialData.manifest_url) {
+        const manifestUrl = initialData.manifest_url.includes(',') 
+          ? initialData.manifest_url.split(',')[0].trim()
+          : initialData.manifest_url.trim();
+        
+        setExistingManifest({
+          id: `existing-manifest-${Date.now()}`,
+          name: manifestUrl.split('/').pop() || 'Manifest File',
+          url: manifestUrl,
+          isExisting: true
+        });
+      }
     } else if (!isOpen) {
       resetForm();
     }
@@ -118,6 +366,8 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       name: '',
       description: '',
       category_id: '',
+      subcategory_id: '',
+      brand_name: '',
       vendor_id: '',
       starting_price: '',
       retail_value: '',
@@ -126,31 +376,57 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       location: '',
       shipping: '',
       quantity: '',
+      quantity_unit: 'units',
       condition: '',
-      tags: '',
-      buy_option: 0,
+      tags: [],
+      listing_type: 'auction',
       sale_price: '',
       weight: '',
       height: '',
       length: '',
       breadth: '',
+      product_location_pin: '',
+      product_city: '',
+      product_state: '',
+      gross_weight: '',
+      num_boxes: '',
+      packaging_type: '',
+      box_height: '',
+      box_length: '',
+      box_breadth: '',
       trending: false,
-      isactive: true
+      isactive: true,
+      seller_declaration: false
     });
     setImages([]);
+    setExistingImages([]);
     setVideos([]);
+    setExistingVideos([]);
     setDocuments([]);
+    setManifest(null);
+    setExistingManifest(null);
     setErrors({});
     setUploadProgress({});
     setImageErrors([]);
     setVideoErrors([]);
     setDocumentErrors([]);
+    setManifestErrors([]);
+    setTagInput('');
+    setPinLoading(false);
   };
 
   // Warn about unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if ((formData.name || images.length > 0 || videos.length > 0 || documents.length > 0) && isOpen) {
+      const hasChanges = formData.name || 
+        images.length > 0 || 
+        existingImages.length > 0 ||
+        videos.length > 0 || 
+        existingVideos.length > 0 ||
+        documents.length > 0 ||
+        manifest !== null ||
+        existingManifest !== null;
+      if (hasChanges && isOpen) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -158,7 +434,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [formData, images, videos, documents, isOpen]);
+  }, [formData, images, existingImages, videos, existingVideos, documents, manifest, existingManifest, isOpen]);
 
   // Handle ESC key to close modal
   useEffect(() => {
@@ -179,7 +455,7 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     };
   }, [isOpen]);
 
-  // Simple input change handler - no debouncing needed
+  // Simple input change handler
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     
@@ -191,8 +467,70 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
+    // Reset subcategory when category changes
+    if (name === 'category_id') {
+      setFormData(prev => ({
+        ...prev,
+        category_id: value,
+        subcategory_id: '' // Reset subcategory when category changes
+      }));
+    }
+
+    // Handle PIN code lookup
+    if (name === 'product_location_pin') {
+      // Clear city and state if PIN is being cleared
+      if (value.length < 6) {
+        setFormData(prev => ({
+          ...prev,
+          product_city: '',
+          product_state: ''
+        }));
+      }
+      // Lookup when 6 digits are entered
+      if (value.length === 6 && /^\d+$/.test(value)) {
+        lookupPinCode(value).then(result => {
+          if (result) {
+            setFormData(prev => ({
+              ...prev,
+              product_city: result.city || '',
+              product_state: result.state || ''
+            }));
+          } else {
+            // Clear fields if lookup fails
+            setFormData(prev => ({
+              ...prev,
+              product_city: '',
+              product_state: ''
+            }));
+          }
+        });
+      }
+    }
   };
-  
+
+  // Handle tag input
+  const handleTagInputKeyDown = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim();
+      if (!formData.tags.includes(newTag)) {
+        setFormData(prev => ({
+          ...prev,
+          tags: [...prev.tags, newTag]
+        }));
+      }
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+
   // Image drag and drop handlers
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -256,6 +594,17 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     if (e.dataTransfer.files) {
       const files = Array.from(e.dataTransfer.files);
       handleDocumentFiles(files);
+    }
+  }, []);
+
+  // Manifest drag and drop handlers
+  const handleManifestDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActiveManifest(true);
+    } else if (e.type === "dragleave") {
+      setDragActiveManifest(false);
     }
   }, []);
   
@@ -331,6 +680,29 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     
     return { valid: true };
   };
+
+  const validateManifest = (file) => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/pdf'
+    ];
+    const allowedExtensions = ['.xls', '.xlsx', '.csv', '.pdf'];
+    
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      return { valid: false, error: `${file.name}: Please upload only Excel or PDF files (.xls, .xlsx, .csv, .pdf)` };
+    }
+    
+    if (file.size > maxSize) {
+      return { valid: false, error: `${file.name}: File size should not exceed 10MB` };
+    }
+    
+    return { valid: true };
+  };
   
   const handleImageFiles = (files) => {
     const newErrors = [];
@@ -358,7 +730,8 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
           file,
           preview: e.target.result,
           name: file.name,
-          size: file.size
+          size: file.size,
+          isExisting: false
         };
         
         setImages(prev => [...prev, newImage]);
@@ -429,6 +802,45 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
       simulateUpload(newDocument.id);
     });
   };
+
+  const handleManifestFile = useCallback((file) => {
+    const validation = validateManifest(file);
+    
+    if (!validation.valid) {
+      setManifestErrors([validation.error]);
+      setTimeout(() => setManifestErrors([]), 5000);
+      return;
+    }
+    
+    const newManifest = {
+      id: Date.now() + Math.random(),
+      file,
+      name: file.name,
+      size: file.size
+    };
+    
+    setManifest(newManifest);
+    setExistingManifest(null); // Clear existing manifest when new one is uploaded
+    simulateUpload(newManifest.id);
+  }, []);
+
+  const handleManifestInput = useCallback((e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      handleManifestFile(file);
+    }
+  }, [handleManifestFile]);
+
+  const handleManifestDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveManifest(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      handleManifestFile(file);
+    }
+  }, [handleManifestFile]);
   
   const simulateUpload = (fileId) => {
     let progress = 0;
@@ -443,21 +855,31 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
   };
   
   const removeImage = (imageId) => {
-    setImages(prev => prev.filter(img => img.id !== imageId));
-    setUploadProgress(prev => {
-      const newProgress = { ...prev };
-      delete newProgress[imageId];
-      return newProgress;
-    });
+    // Check if it's an existing image
+    if (imageId.startsWith('existing-')) {
+      setExistingImages(prev => prev.filter(img => img.id !== imageId));
+    } else {
+      setImages(prev => prev.filter(img => img.id !== imageId));
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[imageId];
+        return newProgress;
+      });
+    }
   };
 
   const removeVideo = (videoId) => {
-    setVideos(prev => prev.filter(vid => vid.id !== videoId));
-    setUploadProgress(prev => {
-      const newProgress = { ...prev };
-      delete newProgress[videoId];
-      return newProgress;
-    });
+    // Check if it's an existing video
+    if (videoId.startsWith('existing-video-')) {
+      setExistingVideos(prev => prev.filter(vid => vid.id !== videoId));
+    } else {
+      setVideos(prev => prev.filter(vid => vid.id !== videoId));
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[videoId];
+        return newProgress;
+      });
+    }
   };
 
   const removeDocument = (docId) => {
@@ -469,12 +891,30 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
     });
   };
 
+  const removeManifest = () => {
+    if (manifest) {
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[manifest.id];
+        return newProgress;
+      });
+    }
+    setManifest(null);
+    setExistingManifest(null);
+  };
+
   const setMainImage = (imageId) => {
-    setImages(prev => {
-      const targetImage = prev.find(img => img.id === imageId);
-      const otherImages = prev.filter(img => img.id !== imageId);
-      return targetImage ? [targetImage, ...otherImages] : prev;
-    });
+    const allImages = [...existingImages, ...images];
+    const targetImage = allImages.find(img => img.id === imageId);
+    if (!targetImage) return;
+
+    if (targetImage.isExisting) {
+      const otherExisting = existingImages.filter(img => img.id !== imageId);
+      setExistingImages([targetImage, ...otherExisting]);
+    } else {
+      const otherImages = images.filter(img => img.id !== imageId);
+      setImages([targetImage, ...otherImages]);
+    }
   };
 
   // Validate current step
@@ -486,7 +926,6 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
         if (!formData?.name?.trim()) newErrors.name = 'Product name is required';
         if (!formData?.description?.trim()) newErrors.description = 'Description is required';
         if (!formData?.category_id) newErrors.category_id = 'Category is required';
-        if (!formData?.location?.trim()) newErrors.location = 'Location is required';
         if (!formData?.condition) newErrors.condition = 'Condition is required';
         if (!formData?.quantity || parseInt(formData?.quantity) <= 0) {
           newErrors.quantity = 'Valid quantity is required';
@@ -494,23 +933,46 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
         break;
         
       case 1: // Pricing & Auction
-        if (!formData?.starting_price || parseFloat(formData?.starting_price) <= 0) {
-          newErrors.starting_price = 'Valid starting price is required';
+        if (!formData?.listing_type) {
+          newErrors.listing_type = 'Listing type is required';
         }
-        if (!formData?.auction_start) newErrors.auction_start = 'Auction start date is required';
-        if (!formData?.auction_end) newErrors.auction_end = 'Auction end date is required';
-        if (formData?.auction_start && formData?.auction_end && 
-            new Date(formData.auction_start) >= new Date(formData.auction_end)) {
-          newErrors.auction_end = 'End date must be after start date';
+        if (formData?.listing_type === 'direct_buy' || formData?.listing_type === 'both') {
+          if (!formData?.sale_price || parseFloat(formData?.sale_price) <= 0) {
+            newErrors.sale_price = 'Buy Now Price is required';
+          }
+        }
+        if (formData?.listing_type === 'auction' || formData?.listing_type === 'both') {
+          if (!formData?.starting_price || parseFloat(formData?.starting_price) <= 0) {
+            newErrors.starting_price = 'Starting Bid Price is required';
+          }
+          if (!formData?.auction_start) newErrors.auction_start = 'Auction start date is required';
+          if (!formData?.auction_end) newErrors.auction_end = 'Auction end date is required';
+          if (formData?.auction_start && formData?.auction_end && 
+              new Date(formData.auction_start) >= new Date(formData.auction_end)) {
+            newErrors.auction_end = 'End date must be after start date';
+          }
         }
         break;
         
-      case 2: // Shipping & Manifest
-        if (!formData?.shipping) newErrors.shipping = 'Shipping option is required';
+      case 2: // Shipping & Pickup
+        if (!formData?.product_location_pin?.trim()) {
+          newErrors.product_location_pin = 'Product Location (PIN) is required';
+        }
+        if (!formData?.gross_weight || parseFloat(formData?.gross_weight) <= 0) {
+          newErrors.gross_weight = 'Approx. Gross Weight is required';
+        }
+        if (!formData?.packaging_type) {
+          newErrors.packaging_type = 'Packaging Type is required';
+        }
         break;
         
       case 3: // Media & Publish
-        if (images?.length === 0) newErrors.images = 'At least one product image is required';
+        if ((images?.length === 0 && existingImages?.length === 0)) {
+          newErrors.images = 'At least one product image is required';
+        }
+        if (!formData?.seller_declaration) {
+          newErrors.seller_declaration = 'You must confirm the seller declaration';
+        }
         break;
     }
 
@@ -529,7 +991,6 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
   };
 
   const handleStepClick = (stepIndex) => {
-    // Allow clicking on any previous step or next step if current is valid
     if (stepIndex < currentStep) {
       setCurrentStep(stepIndex);
     } else if (stepIndex === currentStep + 1 && validateStep(currentStep)) {
@@ -552,32 +1013,96 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
 
     setIsSaving(true);
     try {
+      // Convert listing_type to buy_option
+      let buyOption = 0;
+      if (formData.listing_type === 'direct_buy') {
+        buyOption = 1;
+      } else if (formData.listing_type === 'both') {
+        buyOption = 2;
+      }
+
+      // Map location - use product_location_pin as primary, fallback to location
+      const locationValue = formData.product_location_pin || formData.location || '';
+      
       const productData = {
-        ...formData,
-        category_id: parseInt(formData.category_id),
-        vendor_id: parseInt(formData.vendor_id),
-        starting_price: parseFloat(formData.starting_price),
+        // Basic product info
+        name: formData.name || '',
+        description: formData.description || '',
+        category_id: formData.category_id ? parseInt(formData.category_id) : null,
+        subcategory_id: formData.subcategory_id ? parseInt(formData.subcategory_id) : null,
+        brand_name: formData.brand_name || '',
+        vendor_id: formData.vendor_id ? parseInt(formData.vendor_id) : null,
+        condition: formData.condition || '',
+        
+        // Quantity
+        quantity: formData.quantity ? parseInt(formData.quantity) : null,
+        quantity_unit: formData.quantity_unit || 'units',
+        
+        // Tags
+        tags: Array.isArray(formData.tags) ? formData.tags.join(',') : (formData.tags || ''),
+        
+        // Pricing
+        listing_type: formData.listing_type || 'auction',
+        buy_option: buyOption,
+        starting_price: formData.starting_price ? parseFloat(formData.starting_price) : null,
         retail_value: formData.retail_value ? parseFloat(formData.retail_value) : null,
-        quantity: parseInt(formData.quantity),
-        weight: formData.weight ? parseFloat(formData.weight) : null,
-        height: formData.height ? parseFloat(formData.height) : null,
-        length: formData.length ? parseFloat(formData.length) : null,
-        breadth: formData.breadth ? parseFloat(formData.breadth) : null,
-        buy_option: parseInt(formData.buy_option),
         sale_price: formData.sale_price ? parseFloat(formData.sale_price) : null,
         
-        imageFiles: images?.map(img => img.file),
-        videoFiles: videos?.map(vid => vid.file),
-        documentFiles: documents?.map(doc => doc.file),
+        // Auction dates (only if auction mode)
+        auction_start: (formData.listing_type === 'auction' || formData.listing_type === 'both') 
+          ? (formData.auction_start || null) 
+          : null,
+        auction_end: (formData.listing_type === 'auction' || formData.listing_type === 'both') 
+          ? (formData.auction_end || null) 
+          : null,
         
+        // Location (use product_location_pin as primary)
+        location: locationValue,
+        product_location_pin: formData.product_location_pin || '',
+        product_city: formData.product_city || '',
+        product_state: formData.product_state || '',
+        
+        // Shipping
+        shipping: formData.shipping || '',
+        gross_weight: formData.gross_weight ? parseFloat(formData.gross_weight) : null,
+        num_boxes: formData.num_boxes ? parseInt(formData.num_boxes) : null,
+        packaging_type: formData.packaging_type || '',
+        
+        // Box dimensions
+        box_height: formData.box_height ? parseFloat(formData.box_height) : null,
+        box_length: formData.box_length ? parseFloat(formData.box_length) : null,
+        box_breadth: formData.box_breadth ? parseFloat(formData.box_breadth) : null,
+        
+        // Legacy dimensions (for backward compatibility)
+        weight: formData.gross_weight ? parseFloat(formData.gross_weight) : (formData.weight ? parseFloat(formData.weight) : null),
+        height: formData.box_height ? parseFloat(formData.box_height) : (formData.height ? parseFloat(formData.height) : null),
+        length: formData.box_length ? parseFloat(formData.box_length) : (formData.length ? parseFloat(formData.length) : null),
+        breadth: formData.box_breadth ? parseFloat(formData.box_breadth) : (formData.breadth ? parseFloat(formData.breadth) : null),
+        
+        // Status flags
+        trending: formData.trending || false,
+        isactive: formData.isactive !== undefined ? formData.isactive : true,
+        seller_declaration: formData.seller_declaration || false,
+        status: 'active',
+        auctionstatus: 'pending',
+        
+        // Files
+        imageFiles: images?.filter(img => !img.isExisting && img.file).map(img => img.file) || [],
+        videoFiles: videos?.map(vid => vid.file).filter(Boolean) || [],
+        documentFiles: documents?.map(doc => doc.file).filter(Boolean) || [],
+        manifestFile: manifest?.file || null,
+        
+        // Existing files (for edit mode)
+        existingImageUrls: existingImages?.map(img => img.url || img.preview).filter(Boolean) || [],
+        existingVideoUrls: existingVideos?.map(vid => vid.url).filter(Boolean) || [],
+        existingManifestUrl: existingManifest?.url || null,
+        
+        // Image previews (for reference)
         imagePreviews: images?.map(img => ({
           preview: img?.preview,
           name: img?.name,
           size: img?.size
-        })),
-        
-        status: 'active',
-        auctionstatus: 'pending'
+        })) || []
       };
       
       await onSave(productData);
@@ -589,7 +1114,15 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
   };
 
   const handleClose = () => {
-    if ((formData.name || images.length > 0 || videos.length > 0 || documents.length > 0) && !isSaving) {
+    const hasChanges = formData.name || 
+      images.length > 0 || 
+      existingImages.length > 0 ||
+      videos.length > 0 || 
+      existingVideos.length > 0 ||
+      documents.length > 0 ||
+      manifest !== null ||
+      existingManifest !== null;
+    if (hasChanges && !isSaving) {
       const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to close?');
       if (!confirmClose) return;
     }
@@ -609,6 +1142,12 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
   if (!isOpen) return null;
 
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
+  const allImages = [...existingImages, ...images];
+  const allVideos = [...existingVideos, ...videos];
+  const currentManifest = manifest || existingManifest;
+  const isAuctionMode = formData.listing_type === 'auction' || formData.listing_type === 'both';
+  const requiresBuyNowPrice = formData.listing_type === 'direct_buy' || formData.listing_type === 'both';
+  const availableSubcategories = getAvailableSubcategories();
 
   return (
     <div 
@@ -700,14 +1239,57 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                   placeholder="Enter product name"
                   disabled={isSaving}
                 />
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Category <span className="text-error">*</span>
+                  </label>
+                  <select
+                    name="category_id"
+                    value={formData?.category_id}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    disabled={isSaving}
+                  >
+                    <option value="">Select category</option>
+                    {categories?.map(cat => (
+                      <option key={cat?.value} value={cat?.value}>{cat?.label}</option>
+                    ))}
+                  </select>
+                  {errors?.category_id && (
+                    <p className="text-sm text-error mt-1">{errors?.category_id}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Subcategory
+                  </label>
+                  <select
+                    name="subcategory_id"
+                    value={formData?.subcategory_id}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    disabled={isSaving || !formData.category_id}
+                  >
+                    <option value="">
+                      {formData.category_id ? 'Select subcategory' : 'Select category first'}
+                    </option>
+                    {availableSubcategories?.map(subcat => (
+                      <option key={subcat?.value} value={subcat?.value}>{subcat?.label}</option>
+                    ))}
+                  </select>
+                  {errors?.subcategory_id && (
+                    <p className="text-sm text-error mt-1">{errors?.subcategory_id}</p>
+                  )}
+                </div>
                 <Input
-                  label="Location"
-                  name="location"
-                  value={formData?.location}
+                  label="Brand Name"
+                  name="brand_name"
+                  value={formData?.brand_name}
                   onChange={handleInputChange}
-                  error={errors?.location}
-                  required
-                  placeholder="Enter product location"
+                  placeholder="Enter brand name (optional)"
                   disabled={isSaving}
                 />
               </div>
@@ -733,27 +1315,6 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
-                    Category <span className="text-error">*</span>
-                  </label>
-                  <select
-                    name="category_id"
-                    value={formData?.category_id}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                    disabled={isSaving}
-                  >
-                    <option value="">Select category</option>
-                    {categories?.map(cat => (
-                      <option key={cat?.value} value={cat?.value}>{cat?.label}</option>
-                    ))}
-                  </select>
-                  {errors?.category_id && (
-                    <p className="text-sm text-error mt-1">{errors?.category_id}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
                     Condition <span className="text-error">*</span>
                   </label>
                   <select
@@ -775,73 +1336,65 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Quantity"
-                  name="quantity"
-                  type="number"
-                  min="1"
-                  value={formData?.quantity}
-                  onChange={handleInputChange}
-                  error={errors?.quantity}
-                  required
-                  placeholder="1"
-                  disabled={isSaving}
-                />
-                <Input
-                  label="Tags"
-                  name="tags"
-                  value={formData?.tags}
-                  onChange={handleInputChange}
-                  placeholder="Enter tags separated by commas"
-                  disabled={isSaving}
-                />
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Quantity <span className="text-error">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      value={formData?.quantity}
+                      onChange={handleInputChange}
+                      error={errors?.quantity}
+                      placeholder="1"
+                      disabled={isSaving}
+                      className="flex-1"
+                    />
+                    <select
+                      name="quantity_unit"
+                      value={formData?.quantity_unit}
+                      onChange={handleInputChange}
+                      className="px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                      disabled={isSaving}
+                    >
+                      {quantityUnits?.map(unit => (
+                        <option key={unit?.value} value={unit?.value}>{unit?.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-foreground mb-3">Product Dimensions (Optional)</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Input
-                    label="Weight (kg)"
-                    name="weight"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData?.weight}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
-                    disabled={isSaving}
-                  />
-                  <Input
-                    label="Height (cm)"
-                    name="height"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData?.height}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
-                    disabled={isSaving}
-                  />
-                  <Input
-                    label="Length (cm)"
-                    name="length"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData?.length}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
-                    disabled={isSaving}
-                  />
-                  <Input
-                    label="Width (cm)"
-                    name="breadth"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData?.breadth}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-2 p-3 border border-border rounded-md bg-input min-h-[42px]">
+                  {formData.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="hover:text-primary/80"
+                        disabled={isSaving}
+                      >
+                        <Icon name="X" size={14} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    placeholder="Type and press Enter to add tag"
+                    className="flex-1 min-w-[200px] outline-none bg-transparent text-sm"
                     disabled={isSaving}
                   />
                 </div>
@@ -852,20 +1405,27 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
           {/* Step 1: Pricing & Auction */}
           {currentStep === 1 && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Input
-                  label="Starting Price"
-                  name="starting_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData?.starting_price}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Listing Type <span className="text-error">*</span>
+                </label>
+                <select
+                  name="listing_type"
+                  value={formData?.listing_type}
                   onChange={handleInputChange}
-                  error={errors?.starting_price}
-                  required
-                  placeholder="0.00"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                   disabled={isSaving}
-                />
+                >
+                  {listingTypes?.map(type => (
+                    <option key={type?.value} value={type?.value}>{type?.label}</option>
+                  ))}
+                </select>
+                {errors?.listing_type && (
+                  <p className="text-sm text-error mt-1">{errors?.listing_type}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Retail Value"
                   name="retail_value"
@@ -877,95 +1437,100 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                   placeholder="0.00"
                   disabled={isSaving}
                 />
-                <Input
-                  label="Sale Price"
-                  name="sale_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData?.sale_price}
-                  onChange={handleInputChange}
-                  placeholder="Optional"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Buy Option
-                </label>
-                <select
-                  name="buy_option"
-                  value={formData?.buy_option}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  disabled={isSaving}
-                >
-                  <option value={0}>Auction Only</option>
-                  <option value={1}>Buy Now Available</option>
-                  <option value={2}>Make Offer Available</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Auction Start <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    name="auction_start"
-                    value={formData?.auction_start}
+                {requiresBuyNowPrice && (
+                  <Input
+                    label="Buy Now Price"
+                    name="sale_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData?.sale_price}
                     onChange={handleInputChange}
-                    min={new Date().toISOString().slice(0, 16)}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    error={errors?.sale_price}
+                    required={requiresBuyNowPrice}
+                    placeholder="0.00"
                     disabled={isSaving}
                   />
-                  {errors?.auction_start && (
-                    <p className="text-sm text-error mt-1">{errors?.auction_start}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Auction End <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    name="auction_end"
-                    value={formData?.auction_end}
+                )}
+              </div>
+
+              {isAuctionMode && (
+                <>
+                  <Input
+                    label="Starting Bid Price"
+                    name="starting_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData?.starting_price}
                     onChange={handleInputChange}
-                    min={formData?.auction_start || new Date().toISOString().slice(0, 16)}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    error={errors?.starting_price}
+                    required
+                    placeholder="0.00"
                     disabled={isSaving}
                   />
-                  {errors?.auction_end && (
-                    <p className="text-sm text-error mt-1">{errors?.auction_end}</p>
-                  )}
-                </div>
-              </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Auction Start <span className="text-error">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="auction_start"
+                        value={formData?.auction_start}
+                        onChange={handleInputChange}
+                        min={new Date().toISOString().slice(0, 16)}
+                        className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                        disabled={isSaving}
+                      />
+                      {errors?.auction_start && (
+                        <p className="text-sm text-error mt-1">{errors?.auction_start}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Auction End <span className="text-error">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="auction_end"
+                        value={formData?.auction_end}
+                        onChange={handleInputChange}
+                        min={formData?.auction_start || new Date().toISOString().slice(0, 16)}
+                        className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                        disabled={isSaving}
+                      />
+                      {errors?.auction_end && (
+                        <p className="text-sm text-error mt-1">{errors?.auction_end}</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
                 <h3 className="text-sm font-medium text-foreground mb-2">Pricing Summary</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Starting Bid:</span>
-                    <span className="font-medium text-foreground">
-                      ₹{formData?.starting_price || '0.00'}
-                    </span>
-                  </div>
                   {formData?.retail_value && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Retail Value:</span>
                       <span className="font-medium text-foreground">₹{formData?.retail_value}</span>
                     </div>
                   )}
-                  {formData?.sale_price && (
+                  {requiresBuyNowPrice && formData?.sale_price && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Buy Now Price:</span>
                       <span className="font-medium text-primary">₹{formData?.sale_price}</span>
                     </div>
                   )}
-                  {formData?.auction_start && formData?.auction_end && (
+                  {isAuctionMode && formData?.starting_price && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Starting Bid:</span>
+                      <span className="font-medium text-foreground">₹{formData?.starting_price}</span>
+                    </div>
+                  )}
+                  {isAuctionMode && formData?.auction_start && formData?.auction_end && (
                     <div className="flex justify-between pt-2 border-t border-border">
                       <span className="text-muted-foreground">Auction Duration:</span>
                       <span className="font-medium text-foreground">
@@ -981,127 +1546,146 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
             </div>
           )}
 
-          {/* Step 2: Shipping & Manifest */}
+          {/* Step 2: Shipping & Pickup */}
           {currentStep === 2 && (
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Shipping Option <span className="text-error">*</span>
+                  Product Location (PIN) <span className="text-error">*</span>
                 </label>
-                <select
-                  name="shipping"
-                  value={formData?.shipping}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  disabled={isSaving}
-                >
-                  <option value="">Select shipping option</option>
-                  {shippingOptions?.map(ship => (
-                    <option key={ship?.value} value={ship?.value}>{ship?.label}</option>
-                  ))}
-                </select>
-                {errors?.shipping && (
-                  <p className="text-sm text-error mt-1">{errors?.shipping}</p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="product_location_pin"
+                    value={formData?.product_location_pin}
+                    onChange={handleInputChange}
+                    maxLength={6}
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    placeholder="Enter 6-digit PIN code"
+                    disabled={isSaving}
+                  />
+                  {pinLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <Icon name="Loader" size={16} className="animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+                {errors?.product_location_pin && (
+                  <p className="text-sm text-error mt-1">{errors?.product_location_pin}</p>
+                )}
+                {(formData?.product_city || formData?.product_state) && (
+                  <p className="text-sm text-success mt-1 flex items-center gap-1">
+                    <Icon name="CheckCircle" size={14} />
+                    {formData.product_city}{formData.product_city && formData.product_state ? ', ' : ''}{formData.product_state}
+                  </p>
                 )}
               </div>
 
-              <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                <h3 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                  <Icon name="Info" size={16} />
-                  Shipping Information
-                </h3>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>• Free shipping applies to orders over ₹500</li>
-                  <li>• Standard shipping: 5-7 business days</li>
-                  <li>• Express shipping: 2-3 business days</li>
-                  <li>• Local pickup available at specified location</li>
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input
+                  label="City"
+                  name="product_city"
+                  value={formData?.product_city}
+                  onChange={handleInputChange}
+                  placeholder="Auto-filled from PIN"
+                  disabled={isSaving || pinLoading}
+                />
+                <Input
+                  label="State"
+                  name="product_state"
+                  value={formData?.product_state}
+                  onChange={handleInputChange}
+                  placeholder="Auto-filled from PIN"
+                  disabled={isSaving || pinLoading}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input
+                  label="Approx. Gross Weight (kg)"
+                  name="gross_weight"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData?.gross_weight}
+                  onChange={handleInputChange}
+                  error={errors?.gross_weight}
+                  required
+                  placeholder="0.00"
+                  disabled={isSaving}
+                />
+                <Input
+                  label="No. of Boxes / Cartons"
+                  name="num_boxes"
+                  type="number"
+                  min="0"
+                  value={formData?.num_boxes}
+                  onChange={handleInputChange}
+                  placeholder="0"
+                  disabled={isSaving}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Product Manifest / Documents (Optional)
+                  Packaging Type <span className="text-error">*</span>
                 </label>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Upload Excel files containing product manifest, specifications, or inventory details
-                </p>
-                
-                {documentErrors.length > 0 && (
-                  <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg">
-                    {documentErrors.map((error, index) => (
-                      <p key={index} className="text-sm text-error">{error}</p>
-                    ))}
-                  </div>
-                )}
-                
-                <div
-                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                    dragActiveDoc 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  } ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
-                  onDragEnter={handleDocDrag}
-                  onDragLeave={handleDocDrag}
-                  onDragOver={handleDocDrag}
-                  onDrop={handleDocDrop}
+                <select
+                  name="packaging_type"
+                  value={formData?.packaging_type}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  disabled={isSaving}
                 >
-                  <Icon name="FileText" size={48} className="mx-auto text-muted-foreground mb-4" />
-                  <p className="text-foreground font-medium mb-2">
-                    Drag and drop Excel files here
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Support for .xls, .xlsx, .csv up to 10MB each
-                  </p>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-                    onChange={handleDocumentInput}
-                    className="hidden"
-                    id="document-upload"
+                  <option value="">Select packaging type</option>
+                  {packagingTypes?.map(pkg => (
+                    <option key={pkg?.value} value={pkg?.value}>{pkg?.label}</option>
+                  ))}
+                </select>
+                {errors?.packaging_type && (
+                  <p className="text-sm text-error mt-1">{errors?.packaging_type}</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-foreground mb-3">Product Dimensions of Single Box</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    label="Height (cm)"
+                    name="box_height"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData?.box_height}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
                     disabled={isSaving}
                   />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById('document-upload')?.click()}
-                    iconName="Plus"
-                    iconPosition="left"
+                  <Input
+                    label="Length (cm)"
+                    name="box_length"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData?.box_length}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
                     disabled={isSaving}
-                  >
-                    Select Files
-                  </Button>
+                  />
+                  <Input
+                    label="Width (cm)"
+                    name="box_breadth"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData?.box_breadth}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    disabled={isSaving}
+                  />
                 </div>
-
-                {documents?.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {documents?.map((doc) => (
-                      <div key={doc?.id} className="flex items-center justify-between p-3 bg-muted rounded-lg relative">
-                        <div className="flex items-center space-x-3">
-                          <Icon name="FileText" size={20} className="text-success" />
-                          <div>
-                            <p className="text-sm text-foreground">{doc?.name}</p>
-                            <p className="text-xs text-muted-foreground">{formatFileSize(doc?.size)}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removeDocument(doc?.id)}
-                          className="text-error hover:text-error/80"
-                          disabled={isSaving}
-                        >
-                          <Icon name="X" size={16} />
-                        </button>
-                        {uploadProgress?.[doc?.id] !== undefined && uploadProgress?.[doc?.id] < 100 && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
-                              style={{ width: `${uploadProgress?.[doc?.id]}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1163,11 +1747,12 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                   <p className="text-sm text-error mt-1">{errors?.images}</p>
                 )}
 
-                {images?.length > 0 && (
+                {allImages?.length > 0 && (
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm text-muted-foreground">
-                        {images.length} image{images.length !== 1 ? 's' : ''} selected
+                        {allImages.length} image{allImages.length !== 1 ? 's' : ''} selected
+                        {existingImages.length > 0 && ` (${existingImages.length} existing, ${images.length} new)`}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         First image will be the main image
@@ -1175,17 +1760,22 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {images?.map((image, index) => (
+                      {allImages?.map((image, index) => (
                         <div key={image?.id} className="relative group">
                           <div className="aspect-square rounded-lg overflow-hidden bg-muted border-2 border-border hover:border-primary/50 transition-colors">
                             <img
-                              src={image?.preview}
+                              src={image?.preview || image?.url}
                               alt={image?.name}
                               className="w-full h-full object-cover"
                             />
                             {index === 0 && (
                               <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
                                 Main
+                              </div>
+                            )}
+                            {image?.isExisting && (
+                              <div className="absolute top-2 right-2 bg-success text-success-foreground text-xs px-2 py-1 rounded">
+                                Existing
                               </div>
                             )}
                           </div>
@@ -1215,9 +1805,11 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                             <p className="text-xs text-foreground truncate" title={image?.name}>
                               {image?.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(image?.size)}
-                            </p>
+                            {image?.size && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(image?.size)}
+                              </p>
+                            )}
                             
                             {uploadProgress?.[image?.id] !== undefined && uploadProgress?.[image?.id] < 100 && (
                               <div className="w-full bg-muted rounded-full h-1.5 mt-1 overflow-hidden">
@@ -1290,18 +1882,36 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                   </Button>
                 </div>
 
-                {videos?.length > 0 && (
+                {allVideos?.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <p className="text-sm text-muted-foreground mb-2">
-                      {videos.length} video{videos.length !== 1 ? 's' : ''} uploaded
+                      {allVideos.length} video{allVideos.length !== 1 ? 's' : ''} uploaded
+                      {existingVideos.length > 0 && ` (${existingVideos.length} existing, ${videos.length} new)`}
                     </p>
-                    {videos?.map((video) => (
+                    {allVideos?.map((video) => (
                       <div key={video?.id} className="flex items-center justify-between p-3 bg-muted rounded-lg relative">
                         <div className="flex items-center space-x-3">
                           <Icon name="Film" size={20} className="text-primary" />
-                          <div>
-                            <p className="text-sm text-foreground">{video?.name}</p>
-                            <p className="text-xs text-muted-foreground">{formatFileSize(video?.size)}</p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-foreground">{video?.name}</p>
+                              {video?.isExisting && (
+                                <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded">Existing</span>
+                              )}
+                            </div>
+                            {video?.size && (
+                              <p className="text-xs text-muted-foreground">{formatFileSize(video?.size)}</p>
+                            )}
+                            {video?.url && !video?.file && (
+                              <a 
+                                href={video?.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline"
+                              >
+                                View Video
+                              </a>
+                            )}
                           </div>
                         </div>
                         <button
@@ -1321,6 +1931,107 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Manifest File Section */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Manifest File (Optional)
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Upload a manifest file (Excel, CSV, or PDF) for product documentation
+                </p>
+                
+                {manifestErrors.length > 0 && (
+                  <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg">
+                    {manifestErrors.map((error, index) => (
+                      <p key={index} className="text-sm text-error">{error}</p>
+                    ))}
+                  </div>
+                )}
+                
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    dragActiveManifest 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-primary/50'
+                  } ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
+                  onDragEnter={handleManifestDrag}
+                  onDragLeave={handleManifestDrag}
+                  onDragOver={handleManifestDrag}
+                  onDrop={handleManifestDrop}
+                >
+                  <Icon name="FileText" size={48} className="mx-auto text-muted-foreground mb-4" />
+                  <p className="text-foreground font-medium mb-2">
+                    Drag and drop manifest file here, or click to select
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Support for Excel (.xls, .xlsx), CSV (.csv), or PDF (.pdf) up to 10MB
+                  </p>
+                  <input
+                    type="file"
+                    accept=".xls,.xlsx,.csv,.pdf"
+                    onChange={handleManifestInput}
+                    className="hidden"
+                    id="manifest-upload"
+                    disabled={isSaving}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById('manifest-upload')?.click()}
+                    iconName="Plus"
+                    iconPosition="left"
+                    disabled={isSaving}
+                  >
+                    Select Manifest File
+                  </Button>
+                </div>
+
+                {currentManifest && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg relative">
+                      <div className="flex items-center space-x-3">
+                        <Icon name="FileText" size={20} className="text-primary" />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-foreground">{currentManifest?.name}</p>
+                            {currentManifest?.isExisting && (
+                              <span className="text-xs bg-success/10 text-success px-2 py-0.5 rounded">Existing</span>
+                            )}
+                          </div>
+                          {currentManifest?.size && (
+                            <p className="text-xs text-muted-foreground">{formatFileSize(currentManifest?.size)}</p>
+                          )}
+                          {currentManifest?.url && !currentManifest?.file && (
+                            <a 
+                              href={currentManifest?.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline"
+                            >
+                              View Manifest
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={removeManifest}
+                        className="text-error hover:text-error/80"
+                        disabled={isSaving}
+                      >
+                        <Icon name="X" size={16} />
+                      </button>
+                      {uploadProgress?.[currentManifest?.id] !== undefined && uploadProgress?.[currentManifest?.id] < 100 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${uploadProgress?.[currentManifest?.id]}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1350,6 +2061,28 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                 </label>
               </div>
 
+              {/* Seller Declaration */}
+              <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
+                <h3 className="text-sm font-medium text-foreground mb-3">SELLER DECLARATION (TRUST FACTOR)</h3>
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="seller_declaration"
+                    checked={formData?.seller_declaration}
+                    onChange={handleInputChange}
+                    className="mt-1 rounded border-border disabled:opacity-50"
+                    disabled={isSaving}
+                  />
+                  <span className="text-sm text-foreground">
+                    I confirm that all information provided is accurate to the best of my knowledge,
+                    and the goods listed belong to me or my company for sale.
+                  </span>
+                </label>
+                {errors?.seller_declaration && (
+                  <p className="text-sm text-error mt-2">{errors?.seller_declaration}</p>
+                )}
+              </div>
+
               <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
                 <h3 className="text-sm font-medium text-foreground mb-3">Product Summary</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1363,27 +2096,37 @@ const ProductUploadModal = ({ isOpen, onClose, onSave, initialData = null, isEdi
                       {categories.find(c => c.value === parseInt(formData?.category_id))?.label || 'Not set'}
                     </p>
                   </div>
+                  {formData?.subcategory_id && (
+                    <div>
+                      <span className="text-muted-foreground">Subcategory:</span>
+                      <p className="font-medium text-foreground">
+                        {availableSubcategories.find(s => s.value === parseInt(formData?.subcategory_id))?.label || 'Not set'}
+                      </p>
+                    </div>
+                  )}
+                  {formData?.brand_name && (
+                    <div>
+                      <span className="text-muted-foreground">Brand:</span>
+                      <p className="font-medium text-foreground">{formData?.brand_name}</p>
+                    </div>
+                  )}
                   <div>
-                    <span className="text-muted-foreground">Starting Price:</span>
-                    <p className="font-medium text-foreground">₹{formData?.starting_price || '0.00'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Shipping:</span>
+                    <span className="text-muted-foreground">Listing Type:</span>
                     <p className="font-medium text-foreground">
-                      {shippingOptions.find(s => s.value === formData?.shipping)?.label || 'Not set'}
+                      {listingTypes.find(t => t.value === formData?.listing_type)?.label || 'Not set'}
                     </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Images:</span>
-                    <p className="font-medium text-foreground">{images.length} uploaded</p>
+                    <p className="font-medium text-foreground">{allImages.length} uploaded</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Videos:</span>
-                    <p className="font-medium text-foreground">{videos.length} uploaded</p>
+                    <p className="font-medium text-foreground">{allVideos.length} uploaded</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Documents:</span>
-                    <p className="font-medium text-foreground">{documents.length} uploaded</p>
+                    <span className="text-muted-foreground">Manifest:</span>
+                    <p className="font-medium text-foreground">{currentManifest ? 'Uploaded' : 'Not uploaded'}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Status:</span>

@@ -430,29 +430,48 @@ const ProductCatalogManagement = () => {
 
       // Step 1: Update product basic data
       const updateData = {
-        product_name: productData.name,
-        product_description: productData.description,
-        category_id: productData.category_id,
-        starting_price: productData.starting_price,
-        retail_value: productData.retail_value,
-        auction_start: productData.auction_start,
-        auction_end: productData.auction_end,
-        location: productData.location,
-        shipping: productData.shipping,
-        quantity: productData.quantity,
-        condition: productData.condition,
-        tags: productData.tags,
-        buy_option: productData.buy_option,
-        sale_price: productData.sale_price,
-        weight: productData.weight,
-        height: productData.height,
-        length: productData.length,
-        breadth: productData.breadth,
-        trending: productData.trending,
-        is_active: productData.isactive,
-        product_status: productData.status,
-        auction_status: productData.auctionstatus,
-        auctionstatus: productData.auctionstatus,
+        product_name: productData.name || '',
+        product_description: productData.description || '',
+        category_id: productData.category_id || null,
+        starting_price: productData.starting_price || null,
+        retail_value: productData.retail_value || null,
+        auction_start: productData.auction_start || null,
+        auction_end: productData.auction_end || null,
+        location: productData.location || '',
+        shipping: productData.shipping || '',
+        quantity: productData.quantity || null,
+        quantity_unit: productData.quantity_unit || 'units',
+        condition: productData.condition || '',
+        tags: productData.tags || '',
+        buy_option: productData.buy_option !== undefined ? productData.buy_option : 0,
+        sale_price: productData.sale_price || null,
+        
+        // Shipping fields
+        product_location_pin: productData.product_location_pin || '',
+        product_city: productData.product_city || '',
+        product_state: productData.product_state || '',
+        gross_weight: productData.gross_weight || null,
+        num_boxes: productData.num_boxes || null,
+        packaging_type: productData.packaging_type || '',
+        
+        // Box dimensions
+        box_height: productData.box_height || null,
+        box_length: productData.box_length || null,
+        box_breadth: productData.box_breadth || null,
+        
+        // Legacy dimensions (for backward compatibility)
+        weight: productData.gross_weight || productData.weight || null,
+        height: productData.box_height || productData.height || null,
+        length: productData.box_length || productData.length || null,
+        breadth: productData.box_breadth || productData.breadth || null,
+        
+        // Status
+        trending: productData.trending || false,
+        is_active: productData.isactive !== undefined ? productData.isactive : true,
+        seller_declaration: productData.seller_declaration || false,
+        product_status: productData.status || 'active',
+        auction_status: productData.auctionstatus || 'pending',
+        auctionstatus: productData.auctionstatus || 'pending',
       };
 
       const result = await updatedata('productForm', productId, updateData);
@@ -464,69 +483,111 @@ const ProductCatalogManagement = () => {
       // Step 2: Prepare file paths object
       const filePaths = {};
 
-      // Step 3: Upload and update images if present
+      // Step 3: Combine all files for single upload
+      const allFiles = [];
+      const fileTypeMap = {}; // Track file type by name
+      
+      // Add images
+      const allImageUrls = [];
+      if (productData.existingImageUrls && productData.existingImageUrls.length > 0) {
+        allImageUrls.push(...productData.existingImageUrls);
+      }
       if (productData.imageFiles && productData.imageFiles.length > 0) {
-        const imageUploadPath = `${vendorId}/Products/${productId}`;
-        
-        try {
-          const uploadRes = await uploadMultipleFiles(productData.imageFiles, imageUploadPath);
-          
-          if (uploadRes.success) {
-            const imagePaths = productData.imageFiles.map((file) => {
-              return `${filePathPrefix}/${imageUploadPath}/${file.name}`;
-            }).join(',');
-            
-            filePaths.image_path = imagePaths;
-          }
-        } catch (uploadError) {
-          console.error('Error during image upload:', uploadError);
-        }
+        productData.imageFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'image';
+        });
       }
-
-      // Step 4: Upload and update videos if present
+      
+      // Add videos
+      const allVideoUrls = [];
+      if (productData.existingVideoUrls && productData.existingVideoUrls.length > 0) {
+        allVideoUrls.push(...productData.existingVideoUrls);
+      }
       if (productData.videoFiles && productData.videoFiles.length > 0) {
-        const videoUploadPath = `${vendorId}/Products/${productId}/videos`;
-        
-        try {
-          const uploadRes = await uploadMultipleFiles(productData.videoFiles, videoUploadPath);
-          
-          if (uploadRes.success) {
-            const videoPaths = productData.videoFiles.map((file) => {
-              return `${filePathPrefix}/${videoUploadPath}/${file.name}`;
-            }).join(',');
-            
-            filePaths.video_path = videoPaths;
-          }
-        } catch (uploadError) {
-          console.error('Error during video upload:', uploadError);
-        }
+        productData.videoFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'video';
+        });
       }
-
-      // Step 5: Upload and update documents if present
+      
+      // Add documents (for backward compatibility)
       if (productData.documentFiles && productData.documentFiles.length > 0) {
-        const docUploadPath = `${vendorId}/Products/${productId}/documents`;
+        productData.documentFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'document';
+        });
+      }
+      
+      // Add manifest file
+      if (productData.manifestFile) {
+        allFiles.push(productData.manifestFile);
+        fileTypeMap[productData.manifestFile.name] = 'manifest';
+      }
+      
+      // Step 4: Upload all files at once if there are any new files
+      if (allFiles.length > 0) {
+        const baseUploadPath = `${vendorId}/Products/${productId}`;
         
         try {
-          const uploadRes = await uploadMultipleFiles(productData.documentFiles, docUploadPath);
+          console.log('📤 Uploading all files at once to:', baseUploadPath);
+          const uploadRes = await uploadMultipleFiles(allFiles, baseUploadPath);
           
           if (uploadRes.success) {
-            const docPaths = productData.documentFiles.map((file) => {
-              return `${filePathPrefix}/${docUploadPath}/${file.name}`;
-            }).join(',');
+            // Organize uploaded files by type
+            const manifestFiles = [];
+            allFiles.forEach((file) => {
+              const filePath = `${filePathPrefix}/${baseUploadPath}/${file.name}`;
+              const fileType = fileTypeMap[file.name];
+              
+              if (fileType === 'image') {
+                allImageUrls.push(filePath);
+              } else if (fileType === 'video') {
+                allVideoUrls.push(filePath);
+              } else if (fileType === 'document') {
+                // Documents go to manifest_url (backward compatibility)
+                manifestFiles.push(filePath);
+              } else if (fileType === 'manifest') {
+                // Manifest takes priority - single file
+                manifestFiles.length = 0; // Clear documents if manifest exists
+                manifestFiles.push(filePath);
+              }
+            });
             
-            filePaths.manifest_url = docPaths;
+            // Set manifest_url - manifest file takes priority over documents
+            if (manifestFiles.length > 0) {
+              filePaths.manifest_url = manifestFiles.length === 1 
+                ? manifestFiles[0] 
+                : manifestFiles.join(',');
+            }
+            
+            console.log('✅ All files uploaded successfully');
           }
         } catch (uploadError) {
-          console.error('Error during document upload:', uploadError);
+          console.error('❌ Error during file upload:', uploadError);
         }
       }
+      
+      // Update paths
+      if (allImageUrls.length > 0) {
+        filePaths.image_path = allImageUrls.join(',');
+      }
+      
+      if (allVideoUrls.length > 0) {
+        filePaths.video_path = allVideoUrls.join(',');
+      }
+      
+      // Keep existing manifest if no new one is uploaded
+      if (!productData.manifestFile && !productData.documentFiles?.length && productData.existingManifestUrl) {
+        filePaths.manifest_url = productData.existingManifestUrl;
+      }
 
-      // Step 6: Update product with all file paths in one call
+      // Step 7: Update product with all file paths in one call
       if (Object.keys(filePaths).length > 0) {
         await updatedata('productForm', productId, filePaths);
       }
 
-      // Step 7: Refresh product list
+      // Step 8: Refresh product list
       await fetchAllProducts();
       setIsEditModalOpen(false);
       setEditingProduct(null);
@@ -548,32 +609,51 @@ const ProductCatalogManagement = () => {
 
       // Step 1: Create product with basic data first
       const productFormData = {
-        name: productData.name,
-        description: productData.description,
-        category_id: productData.category_id,
-        starting_price: productData.starting_price,
-        retail_value: productData.retail_value,
-        auction_start: productData.auction_start,
-        auction_end: productData.auction_end,
-        location: productData.location,
-        shipping: productData.shipping,
-        quantity: productData.quantity,
-        condition: productData.condition,
-        tags: productData.tags,
-        buy_option: productData.buy_option,
-        sale_price: productData.sale_price,
-        weight: productData.weight,
-        height: productData.height,
-        length: productData.length,
-        breadth: productData.breadth,
-        trending: productData.trending,
-        isactive: true,
-        status: productData.status,
-        created_by: getUserData()?.email,
-        seller_id: getUserData()?.vendorId,
-        auctionstatus: productData.auctionstatus,
-        vendor_email: getUserData()?.email,
-        vendor_id: getUserData()?.vendorId,
+        name: productData.name || '',
+        description: productData.description || '',
+        category_id: productData.category_id || null,
+        starting_price: productData.starting_price || null,
+        retail_value: productData.retail_value || null,
+        auction_start: productData.auction_start || null,
+        auction_end: productData.auction_end || null,
+        location: productData.location || '',
+        shipping: productData.shipping || '',
+        quantity: productData.quantity || null,
+        quantity_unit: productData.quantity_unit || 'units',
+        condition: productData.condition || '',
+        tags: productData.tags || '',
+        buy_option: productData.buy_option !== undefined ? productData.buy_option : 0,
+        sale_price: productData.sale_price || null,
+        
+        // Shipping fields
+        product_location_pin: productData.product_location_pin || '',
+        product_city: productData.product_city || '',
+        product_state: productData.product_state || '',
+        gross_weight: productData.gross_weight || null,
+        num_boxes: productData.num_boxes || null,
+        packaging_type: productData.packaging_type || '',
+        
+        // Box dimensions
+        box_height: productData.box_height || null,
+        box_length: productData.box_length || null,
+        box_breadth: productData.box_breadth || null,
+        
+        // Legacy dimensions (for backward compatibility)
+        weight: productData.gross_weight || productData.weight || null,
+        height: productData.box_height || productData.height || null,
+        length: productData.box_length || productData.length || null,
+        breadth: productData.box_breadth || productData.breadth || null,
+        
+        // Status
+        trending: productData.trending || false,
+        isactive: productData.isactive !== undefined ? productData.isactive : true,
+        seller_declaration: productData.seller_declaration || false,
+        status: productData.status || 'active',
+        created_by: getUserData()?.email || '',
+        seller_id: getUserData()?.vendorId || null,
+        auctionstatus: productData.auctionstatus || 'pending',
+        vendor_email: getUserData()?.email || '',
+        vendor_id: getUserData()?.vendorId || null,
         currentBid: null,
         image_path: '',
         video_path: '',
@@ -593,70 +673,104 @@ const ProductCatalogManagement = () => {
       // Step 2: Prepare file paths object
       const filePaths = {};
 
-      // Step 3: Upload images if present
+      // Step 3: Combine all files for single upload
+      const allFiles = [];
+      const fileTypeMap = {}; // Track file type by name
+      
+      // Add images
+      const allImageUrls = [];
+      if (productData.existingImageUrls && productData.existingImageUrls.length > 0) {
+        allImageUrls.push(...productData.existingImageUrls);
+      }
       if (productData.imageFiles && productData.imageFiles.length > 0) {
-        const imageUploadPath = `${vendorId}/Products/${productId}`;
-        
-        console.log('📤 Uploading images to:', imageUploadPath);
-        try {
-          const uploadRes = await uploadMultipleFiles(productData.imageFiles, imageUploadPath);
-          
-          if (uploadRes.success) {
-            const imagePaths = productData.imageFiles.map((file) => {
-              return `${filePathPrefix}/${imageUploadPath}/${file.name}`;
-            }).join(',');
-            
-            filePaths.image_path = imagePaths;
-            console.log('✅ Images uploaded. Paths:', imagePaths);
-          }
-        } catch (uploadError) {
-          console.error('❌ Error during image upload:', uploadError);
-        }
+        productData.imageFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'image';
+        });
       }
       
-      // Step 4: Upload videos if present
+      // Add videos
+      const allVideoUrls = [];
       if (productData.videoFiles && productData.videoFiles.length > 0) {
-        const videoUploadPath = `${vendorId}/Products/${productId}/videos`;
+        productData.videoFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'video';
+        });
+      }
+      
+      // Add documents (for backward compatibility)
+      if (productData.documentFiles && productData.documentFiles.length > 0) {
+        productData.documentFiles.forEach(file => {
+          allFiles.push(file);
+          fileTypeMap[file.name] = 'document';
+        });
+      }
+      
+      // Add manifest file
+      if (productData.manifestFile) {
+        allFiles.push(productData.manifestFile);
+        fileTypeMap[productData.manifestFile.name] = 'manifest';
+      }
+      
+      // Step 4: Upload all files at once if there are any new files
+      if (allFiles.length > 0) {
+        const baseUploadPath = `${vendorId}/Products/${productId}`;
         
-        console.log('📤 Uploading videos to:', videoUploadPath);
         try {
-          const uploadRes = await uploadMultipleFiles(productData.videoFiles, videoUploadPath);
+          console.log('📤 Uploading all files at once to:', baseUploadPath);
+          const uploadRes = await uploadMultipleFiles(allFiles, baseUploadPath);
           
           if (uploadRes.success) {
-            const videoPaths = productData.videoFiles.map((file) => {
-              return `${filePathPrefix}/${videoUploadPath}/${file.name}`;
-            }).join(',');
+            // Organize uploaded files by type
+            const manifestFiles = [];
+            allFiles.forEach((file) => {
+              const filePath = `${filePathPrefix}/${baseUploadPath}/${file.name}`;
+              const fileType = fileTypeMap[file.name];
+              
+              if (fileType === 'image') {
+                allImageUrls.push(filePath);
+              } else if (fileType === 'video') {
+                allVideoUrls.push(filePath);
+              } else if (fileType === 'document') {
+                // Documents go to manifest_url (backward compatibility)
+                manifestFiles.push(filePath);
+              } else if (fileType === 'manifest') {
+                // Manifest takes priority - single file
+                manifestFiles.length = 0; // Clear documents if manifest exists
+                manifestFiles.push(filePath);
+              }
+            });
             
-            filePaths.video_path = videoPaths;
-            console.log('✅ Videos uploaded. Paths:', videoPaths);
+            // Set manifest_url - manifest file takes priority over documents
+            if (manifestFiles.length > 0) {
+              filePaths.manifest_url = manifestFiles.length === 1 
+                ? manifestFiles[0] 
+                : manifestFiles.join(',');
+            }
+            
+            console.log('✅ All files uploaded successfully');
           }
         } catch (uploadError) {
-          console.error('❌ Error during video upload:', uploadError);
+          console.error('❌ Error during file upload:', uploadError);
         }
       }
       
-      // Step 5: Upload documents if present
-      if (productData.documentFiles && productData.documentFiles.length > 0) {
-        const docUploadPath = `${vendorId}/Products/${productId}/documents`;
-        
-        console.log('📤 Uploading documents to:', docUploadPath);
-        try {
-          const uploadRes = await uploadMultipleFiles(productData.documentFiles, docUploadPath);
-          
-          if (uploadRes.success) {
-            const docPaths = productData.documentFiles.map((file) => {
-              return `${filePathPrefix}/${docUploadPath}/${file.name}`;
-            }).join(',');
-            
-            filePaths.manifest_url = docPaths;
-            console.log('✅ Documents uploaded. Paths:', docPaths);
-          }
-        } catch (uploadError) {
-          console.error('❌ Error during document upload:', uploadError);
-        }
+      // Update paths
+      if (allImageUrls.length > 0) {
+        filePaths.image_path = allImageUrls.join(',');
+        console.log('✅ All images (existing + new):', filePaths.image_path);
+      }
+      
+      if (allVideoUrls.length > 0) {
+        filePaths.video_path = allVideoUrls.join(',');
+        console.log('✅ All videos:', filePaths.video_path);
+      }
+      
+      if (filePaths.manifest_url) {
+        console.log('✅ Manifest/Documents:', filePaths.manifest_url);
       }
 
-      // Step 6: Update product with all file paths in one call
+      // Step 7: Update product with all file paths in one call
       if (Object.keys(filePaths).length > 0) {
         console.log('📝 Updating product with file paths:', filePaths);
         const updateResult = await updatedata('productForm', productId, filePaths);
@@ -668,7 +782,7 @@ const ProductCatalogManagement = () => {
         }
       }
       
-      // Step 7: Refresh product list and close modal
+      // Step 8: Refresh product list and close modal
       await fetchAllProducts();
       setIsUploadModalOpen(false);
       alert('Product added successfully!');
