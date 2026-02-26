@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
-import { Checkbox } from '../../../components/ui/Checkbox';
 import Icon from '../../../components/AppIcon';
 import Cookies from 'js-cookie';
 import { loginUser } from '../../../services/auth';
@@ -13,7 +12,6 @@ const LoginForm = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    rememberMe: false,
   });
 
   const [errors, setErrors] = useState({});
@@ -41,10 +39,10 @@ const LoginForm = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: value,
     }));
 
     // Clear error when user starts typing
@@ -98,15 +96,6 @@ const LoginForm = () => {
         );
       }
 
-      // ✅ Handle "Remember Me"
-      if (formData.rememberMe) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('rememberedEmail', formData.email);
-      } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('rememberedEmail');
-      }
-
       // ✅ Navigate to dashboard
       console.log('Redirecting to dashboard...');
       navigate('/vendor-analytics', { replace: true });
@@ -149,20 +138,6 @@ const LoginForm = () => {
   const handleForgotPassword = () => {
     navigate('/forgot-password');
   };
-
-  // ✅ Pre-fill email if "Remember Me" was used
-  useEffect(() => {
-    const rememberMe = localStorage.getItem('rememberMe');
-    const rememberedEmail = localStorage.getItem('rememberedEmail');
-    
-    if (rememberMe === 'true' && rememberedEmail) {
-      setFormData(prev => ({
-        ...prev,
-        email: rememberedEmail,
-        rememberMe: true,
-      }));
-    }
-  }, []);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -218,16 +193,8 @@ const LoginForm = () => {
             autoComplete="current-password"
           />
 
-          {/* Remember Me & Forgot Password */}
-          <div className="flex items-center justify-between">
-            <Checkbox
-              label="Remember me"
-              name="rememberMe"
-              checked={formData.rememberMe}
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-
+          {/* Forgot Password */}
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={handleForgotPassword}
@@ -253,7 +220,7 @@ const LoginForm = () => {
         </form>
 
         {/* Sign Up Link */}
-        <div className="mt-6 text-center">
+        {/* <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
             Don't have an account?{' '}
             <button
@@ -265,7 +232,7 @@ const LoginForm = () => {
               Sign up
             </button>
           </p>
-        </div>
+        </div> */}
       </div>
     </div>
   );
