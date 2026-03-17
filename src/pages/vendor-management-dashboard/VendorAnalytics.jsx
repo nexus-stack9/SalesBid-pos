@@ -1,18 +1,150 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  TrendingUp, TrendingDown, Package, IndianRupee, Zap, Clock, 
+  TrendingUp, TrendingDown, Package, IndianRupee, Zap, Clock,
   Users, UserCheck, UserX, RefreshCw, BarChart3, ShoppingBag,
-  AlertCircle, CheckCircle, XCircle, TrendingDown as TrendDown
+  AlertCircle, CheckCircle, XCircle
 } from 'lucide-react';
 import Header from '../../components/ui/Header';
 import Breadcrumb from '../../components/ui/Breadcrumb';
 import { getAllVendors, getAllProductsByVendorId } from '../../services/posCrud';
 import { isAdmin } from '../../utils/auth';
 
+/* ─── Design tokens ──────────────────────────────────────────────────── */
+const TOKEN = {
+  accent: '#2563eb',
+  accentLight: '#eff6ff',
+  accentMid: '#bfdbfe',
+  success: '#059669',
+  successLight: '#ecfdf5',
+  warn: '#d97706',
+  warnLight: '#fffbeb',
+  danger: '#dc2626',
+  dangerLight: '#fef2f2',
+  neutral: '#64748b',
+  neutralLight: '#f8fafc',
+  border: '#e2e8f0',
+  cardShadow: '0 1px 3px 0 rgba(0,0,0,.07), 0 1px 2px -1px rgba(0,0,0,.07)',
+  cardShadowHover: '0 10px 24px -4px rgba(0,0,0,.10), 0 4px 8px -2px rgba(0,0,0,.06)',
+};
+
+/* ─── Tiny style tag (injected once) ─────────────────────────────────── */
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap');
+    .uad-root * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+    .uad-root { background: #f1f5f9; min-height: 100vh; }
+    .stat-card { transition: box-shadow .2s, transform .2s; }
+    .stat-card:hover { box-shadow: ${TOKEN.cardShadowHover}; transform: translateY(-2px); }
+    .tab-btn { transition: background .18s, color .18s; }
+    .uad-chart-tooltip { background:#fff!important; border:1px solid ${TOKEN.border}!important; border-radius:10px!important; padding:10px 14px!important; font-size:13px!important; box-shadow:${TOKEN.cardShadow}!important; }
+    .badge-up { color:#059669; background:#ecfdf5; }
+    .badge-down { color:#dc2626; background:#fef2f2; }
+    .section-bar { display:inline-block; width:3px; height:20px; border-radius:2px; background:${TOKEN.accent}; margin-right:10px; flex-shrink:0; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .refresh-spin { animation: spin .7s linear infinite; }
+  `}</style>
+);
+
+/* ─── Reusable: Section heading ───────────────────────────────────────── */
+const SectionTitle = ({ children }) => (
+  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+    <span className="section-bar" />
+    <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>{children}</h3>
+  </div>
+);
+
+/* ─── Reusable: Stat card ─────────────────────────────────────────────── */
+const StatCard = ({ title, value, change, isPositive, icon: Icon, color, sub }) => (
+  <div
+    className="stat-card"
+    style={{
+      background: '#fff',
+      border: `1px solid ${TOKEN.border}`,
+      borderRadius: 14,
+      padding: '22px 24px',
+      boxShadow: TOKEN.cardShadow,
+    }}
+  >
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+      <div
+        style={{
+          width: 42, height: 42, borderRadius: 10,
+          background: color + '18',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={20} color={color} />
+      </div>
+      <span
+        className={isPositive ? 'badge-up' : 'badge-down'}
+        style={{
+          fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
+          display: 'flex', alignItems: 'center', gap: 3,
+        }}
+      >
+        {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+        {change}
+      </span>
+    </div>
+    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{title}</div>
+    <div style={{ fontSize: 26, fontWeight: 700, color: '#0f172a', lineHeight: 1.1, marginBottom: 4 }}>{value}</div>
+    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{sub}</div>
+  </div>
+);
+
+/* ─── Chart card wrapper ──────────────────────────────────────────────── */
+const ChartCard = ({ title, children }) => (
+  <div
+    style={{
+      background: '#fff',
+      border: `1px solid ${TOKEN.border}`,
+      borderRadius: 14,
+      padding: '22px 24px',
+      boxShadow: TOKEN.cardShadow,
+    }}
+  >
+    <SectionTitle>{title}</SectionTitle>
+    {children}
+  </div>
+);
+
+/* ─── Legend row ──────────────────────────────────────────────────────── */
+const LegendRow = ({ items }) => (
+  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+    {items.map((item, i) => (
+      <div
+        key={i}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: '#f8fafc', border: `1px solid ${TOKEN.border}`,
+          borderRadius: 8, padding: '5px 12px',
+        }}
+      >
+        <div style={{ width: 9, height: 9, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{item.name}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{item.value}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const TooltipStyle = {
+  contentStyle: {
+    background: '#fff', border: `1px solid ${TOKEN.border}`,
+    borderRadius: 10, padding: '10px 14px', fontSize: 13,
+    boxShadow: TOKEN.cardShadow,
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════════════════ */
 const UnifiedAnalyticsDashboard = () => {
   const [activeTab, setActiveTab] = useState('products');
   const [vendors, setVendors] = useState([]);
@@ -26,16 +158,12 @@ const UnifiedAnalyticsDashboard = () => {
   const getUserData = () => {
     const cachedUser = localStorage.getItem('user');
     if (cachedUser) {
-      try {
-        return JSON.parse(cachedUser);
-      } catch (error) {
-        console.error('Error parsing cached user data:', error);
-      }
+      try { return JSON.parse(cachedUser); } catch { }
     }
     return null;
   };
 
-  // ==================== PRODUCT ANALYTICS ====================
+  /* ── Product analytics ──────────────────────────────────────────────── */
   const productAnalytics = useMemo(() => {
     const totalProducts = products.length;
     const activeProducts = products.filter(p => p?.isactive).length;
@@ -43,109 +171,60 @@ const UnifiedAnalyticsDashboard = () => {
     const scheduledAuctions = products.filter(p => p?.auctionstatus === 'scheduled').length;
     const totalRevenue = products.reduce((sum, p) => sum + (parseFloat(p?.starting_price) || 0), 0);
 
-    // Auction status distribution
     const auctionStatusData = [
-      { name: 'Live', value: liveAuctions, color: '#10b981' },
-      { name: 'Scheduled', value: scheduledAuctions, color: '#f59e0b' },
-      { name: 'Ended', value: products.filter(p => p?.auctionstatus === 'ended').length, color: '#6b7280' },
-      { name: 'Draft', value: products.filter(p => !p?.auctionstatus || p?.auctionstatus === 'draft').length, color: '#94a3b8' }
+      { name: 'Live', value: liveAuctions, color: TOKEN.success },
+      { name: 'Scheduled', value: scheduledAuctions, color: TOKEN.warn },
+      { name: 'Ended', value: products.filter(p => p?.auctionstatus === 'ended').length, color: '#94a3b8' },
+      { name: 'Draft', value: products.filter(p => !p?.auctionstatus || p?.auctionstatus === 'draft').length, color: '#cbd5e1' },
     ];
 
-    // Category distribution
     const categoryCount = {};
-    products.forEach(product => {
-      const category = product?.category || 'Other';
-      categoryCount[category] = (categoryCount[category] || 0) + 1;
-    });
+    products.forEach(p => { const c = p?.category || 'Other'; categoryCount[c] = (categoryCount[c] || 0) + 1; });
+    const categoryData = Object.keys(categoryCount).slice(0, 5).map(n => ({ name: n, count: categoryCount[n] }));
 
-    const categoryData = Object.keys(categoryCount).slice(0, 5).map(category => ({
-      name: category,
-      count: categoryCount[category]
-    }));
-
-    // Price range distribution
     const priceRanges = [
-      { range: '₹0-1K', min: 0, max: 1000, count: 0 },
-      { range: '₹1K-5K', min: 1000, max: 5000, count: 0 },
-      { range: '₹5K-10K', min: 5000, max: 10000, count: 0 },
-      { range: '₹10K+', min: 10000, max: Infinity, count: 0 }
+      { range: '₹0–1K', min: 0, max: 1000, count: 0 },
+      { range: '₹1K–5K', min: 1000, max: 5000, count: 0 },
+      { range: '₹5K–10K', min: 5000, max: 10000, count: 0 },
+      { range: '₹10K+', min: 10000, max: Infinity, count: 0 },
     ];
-
-    products.forEach(product => {
-      const price = parseFloat(product?.starting_price) || 0;
-      priceRanges.forEach(range => {
-        if (price >= range.min && price < range.max) {
-          range.count++;
-        }
-      });
+    products.forEach(p => {
+      const price = parseFloat(p?.starting_price) || 0;
+      priceRanges.forEach(r => { if (price >= r.min && price < r.max) r.count++; });
     });
 
-    // Stock status
     const stockData = [
-      { name: 'In Stock', value: products.filter(p => (p?.quantity || 0) > 10).length, color: '#10b981' },
-      { name: 'Low Stock', value: products.filter(p => {
-        const qty = p?.quantity || 0;
-        return qty > 0 && qty <= 10;
-      }).length, color: '#f59e0b' },
-      { name: 'Out of Stock', value: products.filter(p => (p?.quantity || 0) === 0).length, color: '#ef4444' }
+      { name: 'In Stock', value: products.filter(p => (p?.quantity || 0) > 10).length, color: TOKEN.success },
+      { name: 'Low Stock', value: products.filter(p => { const q = p?.quantity || 0; return q > 0 && q <= 10; }).length, color: TOKEN.warn },
+      { name: 'Out of Stock', value: products.filter(p => (p?.quantity || 0) === 0).length, color: TOKEN.danger },
     ];
 
-    // Monthly trend (mock data)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const activityData = months.map(month => ({
-      month,
-      products: Math.floor(Math.random() * 30) + 10
-    }));
+    const activityData = months.map(month => ({ month, products: Math.floor(Math.random() * 30) + 10 }));
 
-    return {
-      totalProducts,
-      activeProducts,
-      liveAuctions,
-      scheduledAuctions,
-      totalRevenue,
-      auctionStatusData,
-      categoryData,
-      priceRanges,
-      stockData,
-      activityData
-    };
+    return { totalProducts, activeProducts, liveAuctions, scheduledAuctions, totalRevenue, auctionStatusData, categoryData, priceRanges, stockData, activityData };
   }, [products]);
 
-  // ==================== VENDOR ANALYTICS ====================
+  /* ── Vendor analytics ───────────────────────────────────────────────── */
   const vendorAnalytics = useMemo(() => {
     const statusDistribution = [
-      { name: 'Pending', value: vendors?.filter(v => v?.approval_status === 'pending')?.length || 0, color: '#f59e0b' },
-      { name: 'Approved', value: vendors?.filter(v => v?.approval_status === 'approved')?.length || 0, color: '#10b981' },
-      { name: 'Rejected', value: vendors?.filter(v => v?.approval_status === 'rejected')?.length || 0, color: '#ef4444' }
+      { name: 'Pending', value: vendors?.filter(v => v?.approval_status === 'pending')?.length || 0, color: TOKEN.warn },
+      { name: 'Approved', value: vendors?.filter(v => v?.approval_status === 'approved')?.length || 0, color: TOKEN.success },
+      { name: 'Rejected', value: vendors?.filter(v => v?.approval_status === 'rejected')?.length || 0, color: TOKEN.danger },
     ];
 
-    // Vendor registrations over time
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const registrationTrend = months.map(month => ({
-      month,
-      vendors: Math.floor(Math.random() * 20) + 5
-    }));
+    const registrationTrend = months.map(month => ({ month, vendors: Math.floor(Math.random() * 20) + 5 }));
 
-    // Category distribution
     const categoryCount = {};
-    vendors.forEach(vendor => {
-      const category = vendor?.items_category || 'Other';
-      categoryCount[category] = (categoryCount[category] || 0) + 1;
-    });
+    vendors.forEach(v => { const c = v?.items_category || 'Other'; categoryCount[c] = (categoryCount[c] || 0) + 1; });
+    const categoryDistribution = Object.keys(categoryCount).slice(0, 5).map(n => ({ name: n, count: categoryCount[n] }));
 
-    const categoryDistribution = Object.keys(categoryCount).slice(0, 5).map(category => ({
-      name: category,
-      count: categoryCount[category]
-    }));
-
-    // Active vs Inactive
     const approvedVendors = vendors.filter(v => v?.approval_status === 'approved');
     const activeCount = approvedVendors.filter(v => v?.isactive)?.length || 0;
-    const inactiveCount = approvedVendors.length - activeCount;
-
     const activityData = [
-      { name: 'Active', value: activeCount, color: '#10b981' },
-      { name: 'Inactive', value: inactiveCount, color: '#6b7280' }
+      { name: 'Active', value: activeCount, color: TOKEN.success },
+      { name: 'Inactive', value: approvedVendors.length - activeCount, color: '#94a3b8' },
     ];
 
     const statusCounts = {
@@ -154,57 +233,15 @@ const UnifiedAnalyticsDashboard = () => {
       rejected: vendors?.filter(v => v?.approval_status === 'rejected')?.length || 0,
     };
 
-    return {
-      statusDistribution,
-      registrationTrend,
-      categoryDistribution,
-      activityData,
-      statusCounts
-    };
+    return { statusDistribution, registrationTrend, categoryDistribution, activityData, statusCounts };
   }, [vendors]);
 
-  // ==================== STATS CARDS ====================
+  /* ── Stats cards ────────────────────────────────────────────────────── */
   const productStats = useMemo(() => [
-    {
-      title: 'Total Products',
-      value: productAnalytics.totalProducts,
-      change: '+12.5%',
-      isPositive: true,
-      icon: Package,
-      iconBg: 'bg-blue-500',
-      iconColor: 'text-blue-500',
-      description: `${productAnalytics.activeProducts} active`
-    },
-    {
-      title: 'Live Auctions',
-      value: productAnalytics.liveAuctions,
-      change: '+8.2%',
-      isPositive: true,
-      icon: Zap,
-      iconBg: 'bg-green-500',
-      iconColor: 'text-green-500',
-      description: 'Currently running'
-    },
-    {
-      title: 'Scheduled',
-      value: productAnalytics.scheduledAuctions,
-      change: '+15.3%',
-      isPositive: true,
-      icon: Clock,
-      iconBg: 'bg-yellow-500',
-      iconColor: 'text-yellow-500',
-      description: 'Upcoming auctions'
-    },
-    {
-      title: 'Total Value',
-      value: `₹${(productAnalytics.totalRevenue / 1000).toFixed(1)}K`,
-      change: '+23.1%',
-      isPositive: true,
-      icon: IndianRupee,
-      iconBg: 'bg-purple-500',
-      iconColor: 'text-purple-500',
-      description: 'Inventory value'
-    }
+    { title: 'Total Products', value: productAnalytics.totalProducts, change: '+12.5%', isPositive: true, icon: Package, color: TOKEN.accent, sub: `${productAnalytics.activeProducts} active` },
+    { title: 'Live Auctions', value: productAnalytics.liveAuctions, change: '+8.2%', isPositive: true, icon: Zap, color: TOKEN.success, sub: 'Currently running' },
+    { title: 'Scheduled', value: productAnalytics.scheduledAuctions, change: '+15.3%', isPositive: true, icon: Clock, color: TOKEN.warn, sub: 'Upcoming auctions' },
+    { title: 'Total Value', value: `₹${(productAnalytics.totalRevenue / 1000).toFixed(1)}K`, change: '+23.1%', isPositive: true, icon: IndianRupee, color: '#7c3aed', sub: 'Inventory value' },
   ], [productAnalytics]);
 
   const vendorStats = useMemo(() => {
@@ -212,147 +249,70 @@ const UnifiedAnalyticsDashboard = () => {
     const approvedVendors = vendors.filter(v => v?.approval_status === 'approved');
     const activeVendors = approvedVendors.filter(v => v?.isactive);
     const pendingVendors = vendors.filter(v => v?.approval_status === 'pending');
-
     return [
-      {
-        title: 'Total Vendors',
-        value: totalVendors,
-        change: '+12.5%',
-        isPositive: true,
-        icon: Users,
-        iconBg: 'bg-blue-500',
-        iconColor: 'text-blue-500',
-        description: 'All registered'
-      },
-      {
-        title: 'Active Vendors',
-        value: activeVendors.length,
-        change: '+8.2%',
-        isPositive: true,
-        icon: UserCheck,
-        iconBg: 'bg-green-500',
-        iconColor: 'text-green-500',
-        description: 'Currently active'
-      },
-      {
-        title: 'Pending Approval',
-        value: pendingVendors.length,
-        change: '-3.1%',
-        isPositive: false,
-        icon: Clock,
-        iconBg: 'bg-yellow-500',
-        iconColor: 'text-yellow-500',
-        description: 'Awaiting review'
-      },
-      {
-        title: 'Rejected',
-        value: vendorAnalytics.statusCounts.rejected,
-        change: '+2.4%',
-        isPositive: false,
-        icon: UserX,
-        iconBg: 'bg-red-500',
-        iconColor: 'text-red-500',
-        description: 'Not approved'
-      }
+      { title: 'Total Vendors', value: totalVendors, change: '+12.5%', isPositive: true, icon: Users, color: TOKEN.accent, sub: 'All registered' },
+      { title: 'Active Vendors', value: activeVendors.length, change: '+8.2%', isPositive: true, icon: UserCheck, color: TOKEN.success, sub: 'Currently active' },
+      { title: 'Pending Approval', value: pendingVendors.length, change: '-3.1%', isPositive: false, icon: Clock, color: TOKEN.warn, sub: 'Awaiting review' },
+      { title: 'Rejected', value: vendorAnalytics.statusCounts.rejected, change: '+2.4%', isPositive: false, icon: UserX, color: TOKEN.danger, sub: 'Not approved' },
     ];
   }, [vendors, vendorAnalytics]);
 
-  // ==================== DATA FETCHING ====================
+  /* ── Data fetching ──────────────────────────────────────────────────── */
   const fetchAllVendors = async () => {
     if (!adminAccess) return;
-    
-    setIsLoadingVendors(true);
-    setVendorError(null);
+    setIsLoadingVendors(true); setVendorError(null);
     try {
-      console.log('📡 Fetching all vendors...');
       const response = await getAllVendors();
-      console.log("✅ Fetched vendors:", response?.data?.length, "vendors");
       setVendors(response?.data || []);
     } catch (err) {
-      if (err.response?.status === 204) {
-        console.log('ℹ️ No vendors found (204)');
-        setVendors([]);
-      } else {
-        console.error('❌ Failed to load vendors:', err);
-        setVendorError("Failed to load vendors");
-      }
-    } finally {
-      setIsLoadingVendors(false);
-    }
+      if (err.response?.status === 204) setVendors([]);
+      else setVendorError("Failed to load vendors");
+    } finally { setIsLoadingVendors(false); }
   };
 
   const fetchAllProducts = async () => {
-    setIsLoadingProducts(true);
-    setProductError(null);
+    setIsLoadingProducts(true); setProductError(null);
     try {
       const userData = getUserData();
-      
-      if (!userData?.vendorId) {
-        setProductError("Vendor ID not found");
-        setProducts([]);
-        return;
-      }
-
-      console.log('📡 Fetching products for vendor:', userData.vendorId);
+      if (!userData?.vendorId) { setProductError("Vendor ID not found"); setProducts([]); return; }
       const response = await getAllProductsByVendorId(userData.vendorId);
-      
-      if (response?.data && Array.isArray(response.data)) {
-        setProducts(response.data);
-        console.log(`✅ Loaded ${response.data.length} products`);
-      } else {
-        setProducts([]);
-        console.log("⚠️ No products found");
-      }
+      setProducts(Array.isArray(response?.data) ? response.data : []);
     } catch (err) {
-      console.error("❌ Error loading products:", err);
-      
-      if (err.response?.status === 204) {
-        console.log("ℹ️ No products available");
-        setProducts([]);
-      } else {
-        setProductError(err.response?.data?.error || "Failed to load products");
-      }
-    } finally {
-      setIsLoadingProducts(false);
-    }
+      if (err.response?.status === 204) setProducts([]);
+      else setProductError(err.response?.data?.error || "Failed to load products");
+    } finally { setIsLoadingProducts(false); }
   };
 
   const handleRefresh = () => {
-    if (activeTab === 'products') {
-      fetchAllProducts();
-    } else if (activeTab === 'vendors' && adminAccess) {
-      fetchAllVendors();
-    }
+    if (activeTab === 'products') fetchAllProducts();
+    else if (activeTab === 'vendors' && adminAccess) fetchAllVendors();
   };
 
   useEffect(() => {
     fetchAllProducts();
-    if (adminAccess) {
-      fetchAllVendors();
-      setActiveTab('products'); // Default to products
-    }
+    if (adminAccess) { fetchAllVendors(); setActiveTab('products'); }
   }, []);
 
-  // ==================== LOADING STATE ====================
   const isLoading = activeTab === 'products' ? isLoadingProducts : isLoadingVendors;
   const currentError = activeTab === 'products' ? productError : vendorError;
 
+  /* ── Full-screen loader ─────────────────────────────────────────────── */
   if (isLoading && (activeTab === 'products' ? products.length === 0 : vendors.length === 0)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="uad-root">
+        <GlobalStyles />
         <Header />
-        <main className="pt-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{paddingLeft: '5rem'}}>
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <div className="relative">
-                  <div className="animate-spin rounded-full h-20 w-20 border-4 border-gray-200 border-t-blue-600 mx-auto mb-6"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <BarChart3 className="text-blue-600" size={32} />
-                  </div>
-                </div>
-                <p className="text-gray-600 font-semibold text-lg">Loading analytics data...</p>
+        <main style={{ paddingTop: 64 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 64px)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ position: 'relative', width: 60, height: 60, margin: '0 auto 20px' }}>
+                <svg className="spinner" viewBox="0 0 60 60" width={60} height={60}>
+                  <circle cx="30" cy="30" r="26" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+                  <circle cx="30" cy="30" r="26" fill="none" stroke={TOKEN.accent} strokeWidth="4" strokeDasharray="40 120" strokeLinecap="round" />
+                </svg>
+                <BarChart3 size={22} color={TOKEN.accent} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
               </div>
+              <p style={{ color: '#475569', fontWeight: 600, fontSize: 14 }}>Loading analytics…</p>
             </div>
           </div>
         </main>
@@ -360,493 +320,227 @@ const UnifiedAnalyticsDashboard = () => {
     );
   }
 
+  /* ── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="uad-root">
+      <GlobalStyles />
       <Header />
-      <main className="pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{paddingLeft: '5rem'}}>
+      <main style={{ paddingTop: 64 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 24px 48px', paddingLeft: '5rem' }}>
           <Breadcrumb />
-          
-          {/* ==================== HEADER ==================== */}
-          <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg">
-                    <BarChart3 className="text-white" size={32} />
-                  </div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    Analytics Dashboard
-                  </h1>
-                </div>
-                <p className="text-gray-600 text-lg">
-                  Comprehensive insights and performance metrics for your business
-                </p>
+
+          {/* Page header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 32 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 48, height: 48, background: TOKEN.accent, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BarChart3 size={24} color="#fff" />
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={handleRefresh}
-                  className="px-5 py-2.5 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 shadow-sm font-medium"
-                >
-                  <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-                  Refresh
-                </button>
+              <div>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0, letterSpacing: '-0.4px' }}>Analytics Dashboard</h1>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0', fontWeight: 400 }}>Comprehensive insights and performance metrics</p>
               </div>
             </div>
+            <button
+              onClick={handleRefresh}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 18px', borderRadius: 9, border: `1px solid ${TOKEN.border}`,
+                background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', boxShadow: TOKEN.cardShadow,
+              }}
+            >
+              <RefreshCw size={15} className={isLoading ? 'refresh-spin' : ''} />
+              Refresh
+            </button>
           </div>
 
-          {/* ==================== TABS ==================== */}
-          <div className="mb-8">
-            <div className="bg-white rounded-2xl p-2 shadow-lg border border-gray-200 inline-flex gap-2">
+          {/* Tabs */}
+          <div style={{ display: 'inline-flex', background: '#fff', border: `1px solid ${TOKEN.border}`, borderRadius: 11, padding: 4, gap: 4, marginBottom: 28, boxShadow: TOKEN.cardShadow }}>
+            {[
+              { key: 'products', label: 'Product Analytics', icon: ShoppingBag },
+              ...(adminAccess ? [{ key: 'vendors', label: 'Vendor Analytics', icon: Users }] : []),
+            ].map(({ key, label, icon: Icon }) => (
               <button
-                onClick={() => setActiveTab('products')}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
-                  activeTab === 'products'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                key={key}
+                className="tab-btn"
+                onClick={() => setActiveTab(key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '9px 18px', borderRadius: 8, border: 'none',
+                  background: activeTab === key ? TOKEN.accent : 'transparent',
+                  color: activeTab === key ? '#fff' : '#64748b',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  boxShadow: activeTab === key ? `0 2px 8px ${TOKEN.accent}44` : 'none',
+                }}
               >
-                <ShoppingBag size={20} />
-                Product Analytics
+                <Icon size={16} />
+                {label}
               </button>
-              {adminAccess && (
-                <button
-                  onClick={() => setActiveTab('vendors')}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    activeTab === 'vendors'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Users size={20} />
-                  Vendor Analytics
-                </button>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* ==================== ERROR STATE ==================== */}
+          {/* Error banner */}
           {currentError && (
-            <div className="mb-8 bg-red-50 border-2 border-red-200 rounded-2xl p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="text-red-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-red-900 font-semibold text-lg mb-1">Error Loading Data</h3>
-                  <p className="text-red-600">{currentError}</p>
-                </div>
-                <button
-                  onClick={handleRefresh}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                >
-                  Try Again
-                </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: TOKEN.dangerLight, border: `1px solid #fecaca`, borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
+              <AlertCircle size={20} color={TOKEN.danger} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#7f1d1d', fontSize: 14 }}>Error Loading Data</div>
+                <div style={{ color: TOKEN.danger, fontSize: 13 }}>{currentError}</div>
               </div>
+              <button onClick={handleRefresh} style={{ padding: '7px 16px', background: TOKEN.danger, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                Retry
+              </button>
             </div>
           )}
 
-          {/* ==================== PRODUCT ANALYTICS ==================== */}
+          {/* ── PRODUCT TAB ─────────────────────────────────────────────── */}
           {activeTab === 'products' && (
-            <div className="space-y-8">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {productStats.map((stat, index) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div
-                      key={index}
-                      className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:scale-105 hover:-translate-y-1 cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className={`p-3 rounded-xl ${stat.iconBg} bg-opacity-10`}>
-                          <Icon className={stat.iconColor} size={28} />
-                        </div>
-                        <span className={`flex items-center text-xs font-bold px-2.5 py-1 rounded-full ${
-                          stat.isPositive ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
-                        }`}>
-                          {stat.isPositive ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                          {stat.change}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium mb-1">{stat.title}</p>
-                        <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
-                        <p className="text-xs text-gray-400 font-medium">{stat.description}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                {productStats.map((s, i) => <StatCard key={i} {...s} />)}
               </div>
-
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Auction Status Distribution */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-green-600 to-emerald-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Auction Status Distribution</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 20 }}>
+                <ChartCard title="Auction Status Distribution">
+                  <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
-                      <Pie
-                        data={productAnalytics.auctionStatusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {productAnalytics.auctionStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                      <Pie data={productAnalytics.auctionStatusData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={4} dataKey="value">
+                        {productAnalytics.auctionStatusData.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
+                      <Tooltip {...TooltipStyle} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap justify-center gap-4 mt-6">
-                    {productAnalytics.auctionStatusData.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-semibold text-gray-700">{item.name}</span>
-                        <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <LegendRow items={productAnalytics.auctionStatusData} />
+                </ChartCard>
 
-                {/* Category Distribution */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Top Product Categories</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={productAnalytics.categoryData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#888" style={{ fontSize: '12px' }} />
-                      <YAxis stroke="#888" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
-                      <Bar dataKey="count" fill="url(#colorBar)" radius={[10, 10, 0, 0]} />
-                      <defs>
-                        <linearGradient id="colorBar" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="100%" stopColor="#6366f1" />
-                        </linearGradient>
-                      </defs>
+                <ChartCard title="Top Product Categories">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={productAnalytics.categoryData} barSize={28}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip {...TooltipStyle} />
+                      <Bar dataKey="count" fill={TOKEN.accent} radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartCard>
 
-                {/* Price Range Distribution */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-purple-600 to-pink-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Price Range Distribution</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+                <ChartCard title="Price Range Distribution">
+                  <ResponsiveContainer width="100%" height={240}>
                     <AreaChart data={productAnalytics.priceRanges}>
                       <defs>
-                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                        <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={TOKEN.accent} stopOpacity={0.18} />
+                          <stop offset="100%" stopColor={TOKEN.accent} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="range" stroke="#888" style={{ fontSize: '12px' }} />
-                      <YAxis stroke="#888" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#a855f7" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorPrice)" 
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="range" stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip {...TooltipStyle} />
+                      <Area type="monotone" dataKey="count" stroke={TOKEN.accent} strokeWidth={2.5} fill="url(#priceGrad)" />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartCard>
 
-                {/* Stock Status */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-600 to-red-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Inventory Stock Status</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+                <ChartCard title="Inventory Stock Status">
+                  <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
-                      <Pie
-                        data={productAnalytics.stockData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {productAnalytics.stockData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                      <Pie data={productAnalytics.stockData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={4} dataKey="value">
+                        {productAnalytics.stockData.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
+                      <Tooltip {...TooltipStyle} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap justify-center gap-4 mt-6">
-                    {productAnalytics.stockData.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-semibold text-gray-700">{item.name}</span>
-                        <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <LegendRow items={productAnalytics.stockData} />
+                </ChartCard>
               </div>
             </div>
           )}
 
-          {/* ==================== VENDOR ANALYTICS (ADMIN ONLY) ==================== */}
+          {/* ── VENDOR TAB ──────────────────────────────────────────────── */}
           {activeTab === 'vendors' && adminAccess && (
-            <div className="space-y-8">
-              {/* Admin Badge */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-xl">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                    <CheckCircle size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">Admin Access Granted</h3>
-                    <p className="text-blue-100">You have full access to vendor analytics and management</p>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* Admin notice */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: TOKEN.accentLight, border: `1px solid ${TOKEN.accentMid}`, borderRadius: 12, padding: '16px 22px' }}>
+                <div style={{ width: 36, height: 36, background: TOKEN.accent, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CheckCircle size={18} color="#fff" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#1e3a8a', fontSize: 14 }}>Admin Access Granted</div>
+                  <div style={{ fontSize: 12, color: '#3b82f6', marginTop: 2 }}>Full access to vendor analytics and management</div>
                 </div>
               </div>
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {vendorStats.map((stat, index) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div
-                      key={index}
-                      className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:scale-105 hover:-translate-y-1 cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className={`p-3 rounded-xl ${stat.iconBg} bg-opacity-10`}>
-                          <Icon className={stat.iconColor} size={28} />
-                        </div>
-                        <span className={`flex items-center text-xs font-bold px-2.5 py-1 rounded-full ${
-                          stat.isPositive ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
-                        }`}>
-                          {stat.isPositive ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
-                          {stat.change}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium mb-1">{stat.title}</p>
-                        <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
-                        <p className="text-xs text-gray-400 font-medium">{stat.description}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                {vendorStats.map((s, i) => <StatCard key={i} {...s} />)}
               </div>
 
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Status Distribution */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-indigo-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Vendor Approval Status</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 20 }}>
+                <ChartCard title="Vendor Approval Status">
+                  <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
-                      <Pie
-                        data={vendorAnalytics.statusDistribution}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {vendorAnalytics.statusDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                      <Pie data={vendorAnalytics.statusDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={4} dataKey="value">
+                        {vendorAnalytics.statusDistribution.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
+                      <Tooltip {...TooltipStyle} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap justify-center gap-4 mt-6">
-                    {vendorAnalytics.statusDistribution.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-semibold text-gray-700">{item.name}</span>
-                        <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <LegendRow items={vendorAnalytics.statusDistribution} />
+                </ChartCard>
 
-                {/* Registration Trend */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-green-600 to-emerald-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Registration Trend</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+                <ChartCard title="Registration Trend">
+                  <ResponsiveContainer width="100%" height={240}>
                     <AreaChart data={vendorAnalytics.registrationTrend}>
                       <defs>
-                        <linearGradient id="colorVendors" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        <linearGradient id="vendorGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={TOKEN.success} stopOpacity={0.18} />
+                          <stop offset="100%" stopColor={TOKEN.success} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="month" stroke="#888" style={{ fontSize: '12px' }} />
-                      <YAxis stroke="#888" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="vendors" 
-                        stroke="#10b981" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorVendors)" 
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="month" stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip {...TooltipStyle} />
+                      <Area type="monotone" dataKey="vendors" stroke={TOKEN.success} strokeWidth={2.5} fill="url(#vendorGrad)" />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartCard>
 
-                {/* Category Distribution */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-purple-600 to-pink-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Top Vendor Categories</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={vendorAnalytics.categoryDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#888" style={{ fontSize: '12px' }} />
-                      <YAxis stroke="#888" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
-                      <Bar dataKey="count" fill="url(#colorVendorBar)" radius={[10, 10, 0, 0]} />
-                      <defs>
-                        <linearGradient id="colorVendorBar" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#a855f7" />
-                          <stop offset="100%" stopColor="#ec4899" />
-                        </linearGradient>
-                      </defs>
+                <ChartCard title="Top Vendor Categories">
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={vendorAnalytics.categoryDistribution} barSize={28}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip {...TooltipStyle} />
+                      <Bar dataKey="count" fill="#7c3aed" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                </ChartCard>
 
-                {/* Active vs Inactive */}
-                <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1.5 h-8 bg-gradient-to-b from-orange-600 to-red-600 rounded-full"></div>
-                    <h3 className="text-xl font-bold text-gray-900">Activity Status</h3>
-                  </div>
-                  <ResponsiveContainer width="100%" height={280}>
+                <ChartCard title="Activity Status">
+                  <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
-                      <Pie
-                        data={vendorAnalytics.activityData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {vendorAnalytics.activityData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                      <Pie data={vendorAnalytics.activityData} cx="50%" cy="50%" innerRadius={60} outerRadius={95} paddingAngle={4} dataKey="value">
+                        {vendorAnalytics.activityData.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#fff', 
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '12px',
-                          padding: '12px'
-                        }} 
-                      />
+                      <Tooltip {...TooltipStyle} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap justify-center gap-4 mt-6">
-                    {vendorAnalytics.activityData.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-semibold text-gray-700">{item.name}</span>
-                        <span className="text-sm font-bold text-gray-900">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <LegendRow items={vendorAnalytics.activityData} />
+                </ChartCard>
               </div>
             </div>
           )}
 
-          {/* ==================== NO ACCESS MESSAGE ==================== */}
+          {/* No access */}
           {activeTab === 'vendors' && !adminAccess && (
-            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-12 text-center">
-              <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <XCircle className="text-yellow-600" size={40} />
+            <div style={{ textAlign: 'center', padding: '64px 24px', background: '#fff', border: `1px solid ${TOKEN.border}`, borderRadius: 14, boxShadow: TOKEN.cardShadow }}>
+              <div style={{ width: 60, height: 60, background: '#fef9c3', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+                <XCircle size={28} color="#ca8a04" />
               </div>
-              <h3 className="text-2xl font-bold text-yellow-900 mb-3">Access Restricted</h3>
-              <p className="text-yellow-700 text-lg">
-                Vendor analytics are only available to administrators.
-              </p>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Access Restricted</h3>
+              <p style={{ fontSize: 14, color: '#64748b' }}>Vendor analytics are only available to administrators.</p>
             </div>
           )}
         </div>

@@ -162,6 +162,24 @@ const Sidebar = () => {
       adminOnly: false,
     },
     {
+      label: 'Pending',
+      path: '/product-pending',
+      icon: 'Clock',
+      adminOnly: false,
+    },
+    {
+      label: 'Approved',
+      path: '/product-approved',
+      icon: 'CheckCircle',
+      adminOnly: false,
+    },
+    {
+      label: 'Rejected',
+      path: '/product-rejected',
+      icon: 'XCircle',
+      adminOnly: false,
+    },
+    {
       label: 'Orders',
       path: '/order-management-system',
       icon: 'ShoppingCart',
@@ -186,6 +204,7 @@ const Sidebar = () => {
   };
 
   const handleLogout = () => {
+    console.log('handleLogout called');
     // Clear all auth data
     localStorage.removeItem('authToken');
     localStorage.removeItem('isAuthenticated');
@@ -217,27 +236,29 @@ const Sidebar = () => {
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="flex flex-col h-full bg-card">
-      {/* Logo Section */}
-      <div className="flex items-center justify-between p-5 lg:p-6 border-b border-border/50">
-        <Link
-          to="/vendor-analytics"
-          className="flex items-center space-x-3 group"
-          onClick={() => isMobile && setIsMobileSidebarOpen(false)}
-        >
-          <div className="relative w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-all duration-300 group-hover:scale-105">
-            <Icon name="Store" size={22} color="white" />
-            <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-bold text-foreground tracking-tight">
-              Sales Bid
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Vendor Portal
-            </span>
-          </div>
-        </Link>
-      </div>
+      {/* Logo Section - hidden on mobile since it shows in header */}
+      {!isMobile && (
+        <div className="flex items-center justify-between p-5 lg:p-6 border-b border-border/50">
+          <Link
+            to="/vendor-analytics"
+            className="flex items-center space-x-3 group"
+            onClick={() => isMobile && setIsMobileSidebarOpen(false)}
+          >
+            <div className="relative w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-all duration-300 group-hover:scale-105">
+              <Icon name="Store" size={22} color="white" />
+              <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-foreground tracking-tight">
+                Sales Bid
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Vendor Portal
+              </span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Navigation Section */}
       <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
@@ -304,129 +325,65 @@ const Sidebar = () => {
 
       {/* User Profile Section */}
       <div className="p-4 border-t border-border/50 bg-muted/20">
-        <div className="relative" ref={isMobile ? null : profileRef}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className={`
-              w-full flex items-center justify-between gap-3 hover:bg-muted/70 rounded-xl p-3
-              transition-all duration-200
-              ${isProfileOpen ? 'bg-muted/70' : ''}
-            `}
-          >
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                <div className="w-10 h-10 bg-gradient-to-br from-secondary to-secondary/80 rounded-xl flex items-center justify-center shadow-md ring-2 ring-background">
-                  {userData?.avatar ? (
-                    <img 
-                      src={userData.avatar} 
-                      alt={userData.name} 
-                      className="w-full h-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <span className="text-white font-semibold text-sm">
-                      {getInitials(userData?.name)}
-                    </span>
-                  )}
-                </div>
-                {/* Online indicator */}
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background" />
-              </div>
-
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {userData?.name || 'User'}
-                </p>
-                <p className="text-xs text-muted-foreground truncate capitalize">
-                  {userData?.role || 'Vendor'}
-                </p>
-              </div>
-            </div>
-
-            <Icon 
-              name="ChevronDown" 
-              size={16} 
-              className={`text-muted-foreground transition-transform duration-200 flex-shrink-0 ${
-                isProfileOpen ? 'rotate-180' : ''
-              }`}
-            />
-          </Button>
-
-          {/* Profile Dropdown */}
-          {isProfileOpen && (
-            <>
-              {/* Mobile backdrop */}
-              {isMobile && (
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsProfileOpen(false)}
+        {/* Profile - Click to go to profile page */}
+        <Link
+          to="/profile"
+          className="flex items-center gap-3 hover:bg-muted/70 rounded-xl p-3 transition-colors duration-200 cursor-pointer"
+        >
+          <div className="relative flex-shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-secondary to-secondary/80 rounded-xl flex items-center justify-center shadow-md ring-2 ring-background">
+              {userData?.avatar ? (
+                <img 
+                  src={userData.avatar} 
+                  alt={userData.name} 
+                  className="w-full h-full rounded-xl object-cover"
                 />
+              ) : (
+                <span className="text-white font-semibold text-sm">
+                  {getInitials(userData?.name)}
+                </span>
               )}
-              
-              <div 
-                className={`
-                  absolute left-0 right-0 bottom-full mb-2 z-50
-                  bg-popover border border-border rounded-xl shadow-2xl
-                  animate-in fade-in slide-in-from-bottom-2 duration-200
-                `}
-              >
-                <div className="p-2">
-                  {/* Profile link */}
-                  <Link
-                    to="/profile"
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      isMobile && setIsMobileSidebarOpen(false);
-                    }}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted rounded-lg transition-colors duration-150"
-                  >
-                    <Icon name="User" size={16} className="text-muted-foreground" />
-                    <span>View Profile</span>
-                  </Link>
+            </div>
+            {/* Online indicator */}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background" />
+          </div>
 
-                  {/* Settings link */}
-                  {/* <Link
-                    to="/settings"
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      isMobile && setIsMobileSidebarOpen(false);
-                    }}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted rounded-lg transition-colors duration-150"
-                  >
-                    <Icon name="Settings" size={16} className="text-muted-foreground" />
-                    <span>Settings</span>
-                  </Link> */}
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">
+              {userData?.name || 'User'}
+            </p>
+            <p className="text-xs text-muted-foreground truncate capitalize">
+              {userData?.role || 'Vendor'}
+            </p>
+          </div>
+        </Link>
 
-                  <div className="h-px bg-border my-2" />
-
-                  {/* Logout button */}
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-error hover:bg-error/10 rounded-lg transition-colors duration-150"
-                  >
-                    <Icon name="LogOut" size={16} />
-                    <span>Sign out</span>
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* Sign Out Button */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 w-full px-3 py-2.5 mt-2 text-sm text-error hover:bg-error/10 rounded-xl transition-colors duration-200 cursor-pointer"
+        >
+          <Icon name="LogOut" size={16} />
+          <span>Sign out</span>
+        </button>
       </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-64 bg-card/95 backdrop-blur-xl border-r border-border/50">
+      {/* Desktop Sidebar - shows at xl (1280px+) */}
+      <aside className="hidden xl:flex fixed left-0 top-0 bottom-0 z-30 w-64 bg-card/95 backdrop-blur-xl border-r border-border/50">
+        <SidebarContent />
+      </aside>
+
+      {/* Tablet Sidebar - shows at md (768px-1279px) */}
+      <aside className="hidden md:flex xl:hidden fixed left-0 top-0 bottom-0 z-30 w-56 bg-card/95 backdrop-blur-xl border-r border-border/50">
         <SidebarContent />
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-xl border-b border-border/50 h-16 shadow-sm">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-xl border-b border-border/50 h-16 shadow-sm">
         <div className="flex items-center justify-between h-full px-4">
           <Link 
             to="/vendor-analytics" 
@@ -462,7 +419,7 @@ const Sidebar = () => {
       {/* Mobile Sidebar Overlay */}
       {isMobileSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 top-16 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+          className="md:hidden fixed inset-0 top-16 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
           onClick={() => setIsMobileSidebarOpen(false)}
         />
       )}
@@ -470,7 +427,7 @@ const Sidebar = () => {
       {/* Mobile Sidebar Drawer */}
       <aside
         className={`
-          lg:hidden fixed top-16 left-0 bottom-0 w-80 max-w-[85vw] z-50
+          md:hidden fixed top-16 left-0 bottom-0 w-80 max-w-[85vw] z-50
           bg-card border-r border-border/50 shadow-2xl
           transform transition-transform duration-300 ease-out
           ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -480,10 +437,13 @@ const Sidebar = () => {
       </aside>
 
       {/* Spacer for desktop */}
-      <div className="hidden lg:block w-64" />
+      <div className="hidden xl:block w-64" />
+
+      {/* Spacer for tablet */}
+      <div className="hidden md:block xl:hidden w-56" />
 
       {/* Spacer for mobile */}
-      <div className="lg:hidden h-16" />
+      <div className="md:hidden h-16" />
     </>
   );
 };

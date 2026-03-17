@@ -17,11 +17,14 @@ const encryptPassword = (password) => {
 };
 
 
-export const getAllProductsByVendorId = async (vendorId) => {
+export const getAllProductsByVendorId = async (vendorId, auctionstatus = '') => {
   try {
     const url = `${API_BASE_URL}/pos/getAllProductsByVendorId/${vendorId}`;
-
-    const response = await axios.get(url);
+    
+    // Only add auctionstatus param if it's not empty
+    const params = auctionstatus ? { auctionstatus } : {};
+    
+    const response = await axios.get(url, { params });
     return response;
   } catch (error) {
     

@@ -1,356 +1,172 @@
 import React, { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
+import { Search, SlidersHorizontal, Plus, X } from 'lucide-react';
 
+/* ─── tokens ─────────────────────────────────────────────────────────── */
+const T = {
+  accent: '#2563eb',
+  accentLight: '#eff6ff',
+  border: '#e2e8f0',
+  shadow: '0 1px 3px 0 rgba(0,0,0,.07)',
+};
+
+const selectStyle = {
+  width: '100%', padding: '8px 12px', fontSize: 13, fontWeight: 500,
+  border: `1px solid ${T.border}`, borderRadius: 9, background: '#fff',
+  color: '#374151', outline: 'none', cursor: 'pointer',
+  appearance: 'none', WebkitAppearance: 'none',
+};
+
+const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 };
+
+/* ─── Component ──────────────────────────────────────────────────────── */
 const FilterControls = ({ onFilterChange, onSearch, onAddProduct }) => {
-  const [filters, setFilters] = useState({
-    category: '',
-    vendor: '',
-    auctionStatus: '',
-    dateRange: '',
-    priceRange: ''
-  });
+  const [filters, setFilters] = useState({ category: '', vendor: '', auctionStatus: '', dateRange: '', priceRange: '' });
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Decode JWT token
   const decodeJWT = (token) => {
     try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
-      return JSON.parse(jsonPayload);
-    } catch (error) {
-      return null;
-    }
+      const b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(decodeURIComponent(atob(b).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+    } catch { return null; }
   };
 
-  // Get user data from token
   const getUserData = () => {
-    const token = 
-      Cookies.get('authToken') || 
-      Cookies.get('accessToken') || 
-      localStorage.getItem('authToken');
-
-    if (token) {
-      const decoded = decodeJWT(token);
-      if (decoded) {
-        return {
-          vendorId: decoded.vendorId || decoded.userId,
-          email: decoded.email,
-          role: decoded.role,
-          name: decoded.name,
-          avatar: decoded.avatar,
-        };
-      }
-    }
-
-    const cachedUser = localStorage.getItem('user');
-    if (cachedUser) {
-      try {
-        return JSON.parse(cachedUser);
-      } catch (error) {
-        return null;
-      }
-    }
-    return null;
+    const token = Cookies.get('authToken') || Cookies.get('accessToken') || localStorage.getItem('authToken');
+    if (token) { const d = decodeJWT(token); if (d) return d; }
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
   };
 
-  // Check if user is admin on component mount
   useEffect(() => {
-    const userData = getUserData();
-    setIsAdmin(userData?.role?.toLowerCase() === 'salesbidadmin');
+    const u = getUserData();
+    setIsAdmin(u?.role?.toLowerCase() === 'salesbidadmin');
   }, []);
 
-  const categories = [
-    { value: '', label: 'All Categories' },
-    { value: 'electronics', label: 'Electronics' },
-    { value: 'fashion', label: 'Fashion' },
-    { value: 'home', label: 'Home & Garden' },
-    { value: 'sports', label: 'Sports & Outdoors' },
-    { value: 'books', label: 'Books' },
-    { value: 'automotive', label: 'Automotive' }
-  ];
-
-  const vendors = [
-    { value: '', label: 'All Vendors' },
-    { value: 'techmart', label: 'TechMart Solutions' },
-    { value: 'fashionhub', label: 'Fashion Hub' },
-    { value: 'homeessentials', label: 'Home Essentials' },
-    { value: 'sportsworld', label: 'Sports World' },
-    { value: 'bookstore', label: 'Digital Bookstore' }
-  ];
-
-  const auctionStatuses = [
-    { value: '', label: 'All Statuses' },
-    { value: 'live', label: 'Live' },
-    { value: 'scheduled', label: 'Scheduled' },
-    { value: 'ended', label: 'Ended' },
-    { value: 'draft', label: 'Draft' }
-  ];
-
-  const dateRanges = [
-    { value: '', label: 'All Time' },
-    { value: 'today', label: 'Today' },
-    { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
-    { value: 'quarter', label: 'This Quarter' }
-  ];
-
-  const priceRanges = [
-    { value: '', label: 'All Prices' },
-    { value: '0-50', label: '₹0 - ₹50' },
-    { value: '50-100', label: '₹50 - ₹100' },
-    { value: '100-500', label: '₹100 - ₹500' },
-    { value: '500-1000', label: '₹500 - ₹1,000' },
-    { value: '1000+', label: '₹1,000+' }
-  ];
+  const CATEGORIES = [{ value: '', label: 'All Categories' }, { value: 'electronics', label: 'Electronics' }, { value: 'fashion', label: 'Fashion' }, { value: 'home', label: 'Home & Garden' }, { value: 'sports', label: 'Sports & Outdoors' }, { value: 'books', label: 'Books' }, { value: 'automotive', label: 'Automotive' }];
+  const VENDORS = [{ value: '', label: 'All Vendors' }, { value: 'techmart', label: 'TechMart Solutions' }, { value: 'fashionhub', label: 'Fashion Hub' }, { value: 'homeessentials', label: 'Home Essentials' }, { value: 'sportsworld', label: 'Sports World' }, { value: 'bookstore', label: 'Digital Bookstore' }];
+  const AUCTION_STATUSES = [{ value: '', label: 'All Statuses' }, { value: 'live', label: 'Live' }, { value: 'scheduled', label: 'Scheduled' }, { value: 'ended', label: 'Ended' }, { value: 'draft', label: 'Draft' }];
+  const DATE_RANGES = [{ value: '', label: 'All Time' }, { value: 'today', label: 'Today' }, { value: 'week', label: 'This Week' }, { value: 'month', label: 'This Month' }, { value: 'quarter', label: 'This Quarter' }];
+  const PRICE_RANGES = [{ value: '', label: 'All Prices' }, { value: '0-50', label: '₹0–₹50' }, { value: '50-100', label: '₹50–₹100' }, { value: '100-500', label: '₹100–₹500' }, { value: '500-1000', label: '₹500–₹1,000' }, { value: '1000+', label: '₹1,000+' }];
 
   const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    onFilterChange(newFilters);
+    const nf = { ...filters, [key]: value };
+    setFilters(nf); onFilterChange(nf);
   };
 
-  const handleSearch = (e) => {
-    e?.preventDefault();
-    onSearch(searchQuery);
-  };
+  const handleSearch = (e) => { e?.preventDefault(); onSearch(searchQuery); };
 
   const clearFilters = () => {
-    const clearedFilters = {
-      category: '',
-      vendor: '',
-      auctionStatus: '',
-      dateRange: '',
-      priceRange: ''
-    };
-    setFilters(clearedFilters);
-    setSearchQuery('');
-    onFilterChange(clearedFilters);
-    onSearch('');
+    const c = { category: '', vendor: '', auctionStatus: '', dateRange: '', priceRange: '' };
+    setFilters(c); setSearchQuery(''); onFilterChange(c); onSearch('');
   };
 
-  const hasActiveFilters = Object.values(filters)?.some(value => value !== '') || searchQuery !== '';
+  const hasActive = Object.values(filters).some(v => v !== '') || searchQuery !== '';
+  const activeCount = Object.values(filters).filter(v => v !== '').length + (searchQuery ? 1 : 0);
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 sm:p-6 mb-6">
-      {/* Search and Add Product */}
-      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <form onSubmit={handleSearch} className="flex-1 max-w-md">
-          <div className="relative">
-            <Icon 
-              name="Search" 
-              size={20} 
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" 
-            />
-            <Input
-              type="search"
-              placeholder="Search products, SKUs, vendors..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e?.target?.value)}
-              className="pl-10"
-            />
-          </div>
+    <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 14, padding: '20px 22px', marginBottom: 18, boxShadow: T.shadow }}>
+      {/* Top row: search + actions */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
+        <form onSubmit={handleSearch} style={{ flex: 1, minWidth: 220, position: 'relative' }}>
+          <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search products, SKUs, vendors…"
+            style={{ width: '100%', padding: '9px 12px 9px 34px', border: `1px solid ${T.border}`, borderRadius: 9, fontSize: 13, color: '#374151', background: '#f8fafc', outline: 'none' }}
+          />
         </form>
-        
-        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
-          <Button
-            variant="outline"
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            iconName="Filter"
-            iconPosition="left"
-            size="sm"
-            className="w-full sm:w-auto"
-          >
-            {showAdvancedFilters ? 'Hide Filters' : 'Show Filters'}
-          </Button>
-          <Button
-            variant="default"
-            onClick={onAddProduct}
-            iconName="Plus"
-            iconPosition="left"
-            size="sm"
-            className="w-full sm:w-auto"
-          >
-            Add Product
-          </Button>
-        </div>
+        <button
+          onClick={() => setShowAdvanced(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', border: `1px solid ${showAdvanced ? T.accent : T.border}`, borderRadius: 9, background: showAdvanced ? T.accentLight : '#fff', color: showAdvanced ? T.accent : '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer', position: 'relative' }}
+        >
+          <SlidersHorizontal size={15} />
+          Filters
+          {activeCount > 0 && <span style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, background: T.accent, color: '#fff', borderRadius: '50%', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{activeCount}</span>}
+        </button>
+        <button
+          onClick={onAddProduct}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', border: 'none', borderRadius: 9, background: T.accent, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: `0 2px 8px ${T.accent}44` }}
+        >
+          <Plus size={15} />
+          Add Product
+        </button>
       </div>
 
-      {/* Quick Filters */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isAdmin ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-4 mb-4`}>
+      {/* Filters row */}
+      {showAdvanced && (
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Category</label>
-          <select
-            value={filters?.category}
-            onChange={(e) => handleFilterChange('category', e?.target?.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {categories?.map(option => (
-              <option key={option?.value} value={option?.value}>
-                {option?.label}
-              </option>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(160px, 1fr))`, gap: 14, marginBottom: 14 }}>
+            {[
+              { key: 'category', opts: CATEGORIES, label: 'Category' },
+              ...(isAdmin ? [{ key: 'vendor', opts: VENDORS, label: 'Vendor' }] : []),
+              { key: 'auctionStatus', opts: AUCTION_STATUSES, label: 'Auction Status' },
+              { key: 'dateRange', opts: DATE_RANGES, label: 'Date Range' },
+              { key: 'priceRange', opts: PRICE_RANGES, label: 'Price Range' },
+            ].map(({ key, opts, label }) => (
+              <div key={key}>
+                <label style={labelStyle}>{label}</label>
+                <div style={{ position: 'relative' }}>
+                  <select value={filters[key]} onChange={e => handleFilterChange(key, e.target.value)} style={selectStyle}>
+                    {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <svg style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width={14} height={14} viewBox="0 0 14 14" fill="none">
+                    <path d="M3 5l4 4 4-4" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
             ))}
-          </select>
-        </div>
-
-        {isAdmin && (
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Vendor</label>
-            <select
-              value={filters?.vendor}
-              onChange={(e) => handleFilterChange('vendor', e?.target?.value)}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {vendors?.map(option => (
-                <option key={option?.value} value={option?.value}>
-                  {option?.label}
-                </option>
-              ))}
-            </select>
           </div>
-        )}
 
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Auction Status</label>
-          <select
-            value={filters?.auctionStatus}
-            onChange={(e) => handleFilterChange('auctionStatus', e?.target?.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {auctionStatuses?.map(option => (
-              <option key={option?.value} value={option?.value}>
-                {option?.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Date Range</label>
-          <select
-            value={filters?.dateRange}
-            onChange={(e) => handleFilterChange('dateRange', e?.target?.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {dateRanges?.map(option => (
-              <option key={option?.value} value={option?.value}>
-                {option?.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Price Range</label>
-          <select
-            value={filters?.priceRange}
-            onChange={(e) => handleFilterChange('priceRange', e?.target?.value)}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {priceRanges?.map(option => (
-              <option key={option?.value} value={option?.value}>
-                {option?.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-end">
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              onClick={clearFilters}
-              iconName="X"
-              iconPosition="left"
-              className="w-full"
-              size="sm"
-            >
-              Clear All
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Advanced Filters */}
-      {showAdvancedFilters && (
-        <div className="border-t border-border pt-4">
-          <h3 className="text-sm font-medium text-foreground mb-4">Advanced Filters</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Input
-              label="Min Price"
-              type="number"
-              placeholder="0"
-              className="w-full"
-            />
-            <Input
-              label="Max Price"
-              type="number"
-              placeholder="1000"
-              className="w-full"
-            />
-            <Input
-              label="Start Date"
-              type="date"
-              className="w-full"
-            />
-            <Input
-              label="End Date"
-              type="date"
-              className="w-full"
-            />
+          {/* Advanced inputs */}
+          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>Advanced</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+              {[
+                { placeholder: 'Min Price', type: 'number' },
+                { placeholder: 'Max Price', type: 'number' },
+                { placeholder: 'Start Date', type: 'date' },
+                { placeholder: 'End Date', type: 'date' },
+              ].map((inp, i) => (
+                <div key={i}>
+                  <label style={labelStyle}>{inp.placeholder}</label>
+                  <input type={inp.type} placeholder={inp.placeholder} style={{ ...selectStyle, padding: '8px 12px' }} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Active Filters Display */}
-      {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-          {Object.entries(filters)?.map(([key, value]) => {
-            if (!value) return null;
-            // Skip vendor filter display if not admin
-            if (key === 'vendor' && !isAdmin) return null;
-            
-            const label = key?.charAt(0)?.toUpperCase() + key?.slice(1);
+      {/* Active filter chips */}
+      {hasActive && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: showAdvanced ? 14 : 0, paddingTop: showAdvanced ? 14 : 0, borderTop: showAdvanced ? `1px solid ${T.border}` : 'none' }}>
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>Active:</span>
+          {Object.entries(filters).map(([key, value]) => {
+            if (!value || (key === 'vendor' && !isAdmin)) return null;
             return (
-              <span
-                key={key}
-                className="inline-flex items-center space-x-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
-              >
-                <span>{label}: {value}</span>
-                <button
-                  onClick={() => handleFilterChange(key, '')}
-                  className="hover:text-primary/80"
-                >
-                  <Icon name="X" size={12} />
+              <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', background: T.accentLight, color: T.accent, borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                {key.charAt(0).toUpperCase() + key.slice(1)}: {value}
+                <button onClick={() => handleFilterChange(key, '')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: T.accent }}>
+                  <X size={12} />
                 </button>
               </span>
             );
           })}
           {searchQuery && (
-            <span className="inline-flex items-center space-x-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-              <span>Search: {searchQuery}</span>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  onSearch('');
-                }}
-                className="hover:text-primary/80"
-              >
-                <Icon name="X" size={12} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', background: T.accentLight, color: T.accent, borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+              Search: {searchQuery}
+              <button onClick={() => { setSearchQuery(''); onSearch(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: T.accent }}>
+                <X size={12} />
               </button>
             </span>
           )}
+          <button onClick={clearFilters} style={{ fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, textDecoration: 'underline', fontFamily: 'inherit' }}>
+            Clear all
+          </button>
         </div>
       )}
     </div>

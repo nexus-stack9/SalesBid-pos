@@ -14,6 +14,11 @@ import VendorAnalytics from './pages/vendor-management-dashboard/VendorAnalytics
 import Profile from "./pages/Profile";
 import LiveViewerPage from "./pages/LiveViewerPage";
 
+// Wrapper components for different product status views
+const ApprovedProducts = () => <ProductCatalogManagement statusFilter="approved" />;
+const PendingProducts = () => <ProductCatalogManagement statusFilter="pending" />;
+const RejectedProducts = () => <ProductCatalogManagement statusFilter="rejected" />;
+
 
 const Routes = () => {
   return (
@@ -37,6 +42,9 @@ const Routes = () => {
               <Route path="/profile" element={<Profile />} />
 
               <Route path="/product-catalog-management" element={<ProductCatalogManagement />} />
+              <Route path="/product-approved" element={<ApprovedProducts />} />
+              <Route path="/product-pending" element={<PendingProducts />} />
+              <Route path="/product-rejected" element={<RejectedProducts />} />
             </Route>
           </Route>
 
