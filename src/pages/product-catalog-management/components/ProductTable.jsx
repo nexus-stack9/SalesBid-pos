@@ -1,613 +1,547 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
-import Image from '../../../components/AppImage';
-import Button from '../../../components/ui/Button';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import ImageGalleryModal from '../../../components/ui/ImageGalleryModal';
 import ScheduleAuctionModal from '../../../components/ui/ScheduleAuctionModal';
 import ProductViewModal from '../../../components/ui/ProductViewModal';
 import GoLiveModal from '../../../components/ui/GoLiveModal';
 
-const ProductTable = ({ 
-  products, 
-  onStatusToggle, 
-  onAuctionToggle, 
-  onEditProduct, 
-  onBulkAction,
-  selectedProducts,
-  onSelectProduct,
-  onSelectAll,
-  onCellValueUpdate,
-  onAuctionSchedule,
-  currentPageProducts
-}) => {
-  const [editingCell, setEditingCell] = useState(null);
-  const [editValue, setEditValue] = useState('');
-  const [imageGalleryModal, setImageGalleryModal] = useState({ isOpen: false, product: null });
-  const [scheduleModal, setScheduleModal] = useState({ isOpen: false, product: null });
-  const [viewModal, setViewModal] = useState({ isOpen: false, product: null });
-  const [goLiveModal, setGoLiveModal] = useState({ isOpen: false, product: null });
-  const [imageErrors, setImageErrors] = useState({});
+/* ─── Styles ─────────────────────────────────────────────────────────── */
+const STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
-  // Placeholder image for fallback
-  const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect fill="%23f0f0f0" width="100" height="100"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+.pt-root { font-family: 'DM Sans', sans-serif; }
+.pt-root * { box-sizing: border-box; }
 
-  // Get the first image URL from comma-separated string for main display
-  const getMainImageUrl = (product) => {
-    if (!product?.image_path) {
-      console.log('No image_path found for product:', product?.name);
-      return null;
-    }
+/* ── Table row ── */
+.pt-tbody-row {
+  display: contents;
+}
+.pt-tbody-row > div {
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  transition: background 0.12s;
+  min-width: 0;
+}
+.pt-tbody-row:hover > div { background: #f8fafc; }
+.pt-tbody-row.selected > div { background: #eff6ff; }
 
-    // Clean and parse the image path
-    const imagePath = product.image_path.trim();
-    
-    // Handle comma-separated paths
-    if (imagePath.includes(',')) {
-      const imageUrls = imagePath.split(',').map(url => url.trim()).filter(url => url);
-      // console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
-      return imageUrls[0] || null;
-    }
+/* ── Icon action button ── */
+.pt-act {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid #e2e8f0; background: #f8fafc;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #64748b; transition: all 0.13s;
+  flex-shrink: 0; padding: 0;
+}
+.pt-act:hover { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+.pt-act.pt-live { background: #dc2626; border-color: #dc2626; color: #fff; }
+.pt-act.pt-live:hover { background: #b91c1c; }
+.pt-act:disabled { opacity: 0.28; cursor: not-allowed; pointer-events: none; }
 
-    // console.log(`Product "${product?.name}" image URL:`, imagePath);
-    return imagePath;
-  };
+/* ── Auction badge ── */
+.pt-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.pt-badge.live      { background: #ecfdf5; color: #059669; }
+.pt-badge.scheduled { background: #fffbeb; color: #d97706; }
+.pt-badge.ended     { background: #f1f5f9; color: #64748b; }
+.pt-badge.draft     { background: #f8fafc; color: #94a3b8; }
+.pt-badge .dot-live { animation: pt-pulse 2s infinite; }
 
-  // Parse product images from comma-separated image_path string
-  const getProductImages = (product) => {
-    if (!product?.image_path) {
-      // console.log('No image_path found for product:', product?.name);
-      return [];
-    }
+@keyframes pt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
 
-    // Clean and parse the image path
-    const imagePath = product.image_path.trim();
-    
-    // Split the comma-separated string into individual image URLs
-    const imageUrls = imagePath
-      .split(',')
-      .map(url => url.trim())
-      .filter(url => url); // Remove empty strings
+/* ── Status pill ── */
+.pt-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 11px; border-radius: 20px; border: none;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: filter 0.13s;
+  white-space: nowrap;
+}
+.pt-status:hover { filter: brightness(0.93); }
+.pt-status.on  { background: #ecfdf5; color: #059669; }
+.pt-status.off { background: #f1f5f9; color: #64748b; }
 
-    // console.log(`Product "${product?.name}" has ${imageUrls.length} images:`, imageUrls);
+/* ── Media button ── */
+.pt-media {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border: 1px solid #e2e8f0;
+  border-radius: 7px; background: #f8fafc; color: #475569;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: all 0.12s;
+}
+.pt-media:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 
-    // Return array of image objects for the gallery
-    return imageUrls.map((url, index) => ({
-      url: url,
-      alt: `${product?.name} - Image ${index + 1}`
-    }));
-  };
+/* ── Schedule cal btn ── */
+.pt-cal {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid #e2e8f0; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #94a3b8; transition: all 0.12s;
+}
+.pt-cal:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 
-  // Handle image load error
-  const handleImageError = (productId) => {
-    // console.error(`Failed to load image for product ID: ${productId}`);
-    setImageErrors(prev => ({ ...prev, [productId]: true }));
-  };
+/* ── Inline date editing ── */
+.pt-date-read {
+  background: none; border: none; cursor: pointer;
+  padding: 2px 6px; border-radius: 5px;
+  font-size: 12px; color: #374151; font-family: inherit;
+  transition: background 0.1s;
+}
+.pt-date-read:hover { background: #eff6ff; color: #2563eb; }
+.pt-date-input {
+  padding: 4px 8px; border: 1.5px solid #93c5fd; border-radius: 7px;
+  font-size: 12px; font-family: inherit; outline: none; background: #fff;
+}
 
-  // Handle image load success
-  const handleImageLoad = (productId) => {
-    // console.log(`Successfully loaded image for product ID: ${productId}`);
-    setImageErrors(prev => ({ ...prev, [productId]: false }));
-  };
+/* ── Mobile card ── */
+.pt-card {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 14px; padding: 15px 16px;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.pt-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+.pt-card.sel { border-color: #93c5fd; background: #f0f7ff; }
 
-  const handleCellEdit = (productId, field, currentValue) => {
-    setEditingCell(`${productId}-${field}`);
-    setEditValue(currentValue);
-  };
+/* ── Empty state ── */
+.pt-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 72px 24px; text-align: center;
+}
 
-  const handleCellSave = async (productId, field) => {
-    try {
-      const updateData = {
-        [field]: editValue
-      };
+/* ── Responsive ── */
+@media (min-width: 1280px) { .pt-mobile-view { display: none !important; } }
+@media (min-width: 1024px) and (max-width: 1279px) { 
+  .pt-mobile-view { display: none !important; }
+  .pt-tablet-view { display: flex !important; }
+}
+@media (max-width: 1023px) { 
+  .pt-desktop-view { display: none !important; }
+  .pt-tablet-view { display: none !important; }
+}
+@media (max-width: 767px) { 
+  .pt-tablet-view { display: flex !important; }
+}
+`;
 
-      if (field === 'startDate' || field === 'auction_start') {
-        updateData.auction_start = editValue;
-      } else if (field === 'endDate' || field === 'auction_end') {
-        updateData.auction_end = editValue;
-      }
+/* ─── Helpers ────────────────────────────────────────────────────────── */
+const PH_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23f1f5f9' width='80' height='80'/%3E%3Ccircle cx='40' cy='32' r='12' fill='%23cbd5e1'/%3E%3Cellipse cx='40' cy='60' rx='18' ry='10' fill='%23cbd5e1'/%3E%3C/svg%3E";
 
-      // console.log(`Saving ${field} for product ${productId}:`, updateData);
-      onCellValueUpdate(productId, field, editValue);
+const getMainImg = p => {
+  if (!p?.image_path) return null;
+  const s = p.image_path.trim();
+  return s.includes(',') ? s.split(',')[0].trim() : s;
+};
 
-      setEditingCell(null);
-      setEditValue('');
-      // console.log('Cell value saved successfully');
-    } catch (error) {
-      // console.error('Error saving cell value:', error);
-      alert('Failed to save changes. Please try again.');
-    }
-  };
+const getImages = p => {
+  if (!p?.image_path) return [];
+  return p.image_path.trim().split(',')
+    .map(u => u.trim()).filter(Boolean)
+    .map((url, i) => ({ url, alt: `${p.name} ${i + 1}` }));
+};
 
-  const handleCellCancel = () => {
-    setEditingCell(null);
-    setEditValue('');
-  };
+const fmtDate = d => {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+};
 
-  const handleViewImages = (product) => {
-    const images = getProductImages(product);
-    // console.log('Opening gallery with images:', images);
-    setImageGalleryModal({ isOpen: true, product });
-  };
+const canGoLive = p => p?.isactive && p?.auction_start && p?.auction_end;
 
-  const handleViewProduct = (product) => {
-    setViewModal({ isOpen: true, product });
-  };
+/* ─── Sub-components ─────────────────────────────────────────────────── */
 
-  const handleScheduleAuction = (product) => {
-    setScheduleModal({ isOpen: true, product });
-  };
+const AuctionBadge = ({ status }) => {
+  const s = status || 'draft';
+  return (
+    <span className={`pt-badge ${s}`}>
+      <span
+        className={s === 'live' ? 'dot-live' : ''}
+        style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }}
+      />
+      {s.charAt(0).toUpperCase() + s.slice(1)}
+    </span>
+  );
+};
 
-  const handleGoLive = (product) => {
-    setGoLiveModal({ isOpen: true, product });
-  };
+const EditableDate = ({ productId, field, value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState('');
 
-  const handleAuctionScheduled = async (auctionData) => {
-    // console.log('Auction scheduled:', auctionData);
-    if (onAuctionSchedule) {
-      await onAuctionSchedule(auctionData);
-    }
-    setScheduleModal({ isOpen: false, product: null });
-  };
+  const handleSave = () => { onSave(productId, field, val); setEditing(false); };
 
-  const handleLiveStreamStart = (liveData) => {
-    // console.log('Live stream started:', liveData);
-    // Update product status to live
-    // Make API call to start live stream
-  };
-
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date)?.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getAuctionStatusBadge = (status) => {
-    const statusConfig = {
-      'live': { color: 'bg-success text-success-foreground', icon: 'Zap' },
-      'scheduled': { color: 'bg-warning text-warning-foreground', icon: 'Clock' },
-      'ended': { color: 'bg-secondary text-secondary-foreground', icon: 'CheckCircle' },
-      'draft': { color: 'bg-muted text-muted-foreground', icon: 'Edit' }
-    };
-
-    const config = statusConfig?.[status] || statusConfig?.draft;
-
-    return (
-      <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config?.color}`}>
-        <Icon name={config?.icon} size={12} />
-        <span className="capitalize">{status || 'draft'}</span>
-      </span>
-    );
-  };
-
-  // Check if product can go live (active and has auction scheduled)
-  const canGoLive = (product) => {
-    return product?.isactive && product?.auction_start && product?.auction_end;
-  };
-
-  // Checkbox selection logic - use current page products for select all
-  const isAllSelected = products?.length > 0 &&
-    products?.every(product => selectedProducts?.includes(product?.product_id));
-  const isIndeterminate = products?.length > 0 &&
-    products?.some(product => selectedProducts?.includes(product?.product_id)) &&
-    !isAllSelected;
-
-  // Product Image Component with error handling
-  const ProductImage = ({ product, size = 'small' }) => {
-    const imageUrl = getMainImageUrl(product);
-    const hasError = imageErrors[product?.product_id];
-    
-    const sizeClasses = {
-      small: 'w-12 h-12',
-      medium: 'w-16 h-16'
-    };
-
-    // Debug logging
-    // React.useEffect(() => {
-    //   console.log(`ProductImage render for "${product?.name}":`, {
-    //     imageUrl,
-    //     hasError,
-    //     image_path: product?.image_path
-    //   });
-    // }, [imageUrl, hasError, product]);
-
-    return (
-      <div className={`${sizeClasses[size]} rounded-lg overflow-hidden bg-muted flex-shrink-0`}>
-        {imageUrl && !hasError ? (
-          <img
-            src={imageUrl}
-            alt={product?.name || 'Product'}
-            className="w-full h-full object-cover"
-            onError={() => handleImageError(product?.product_id)}
-            onLoad={() => handleImageLoad(product?.product_id)}
-            loading="lazy"
-          />
-        ) : (
-          <img
-            src={PLACEHOLDER_IMAGE}
-            alt="No image available"
-            className="w-full h-full object-cover"
-          />
-        )}
-      </div>
-    );
-  };
+  if (editing) return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <input
+        type="date"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        className="pt-date-input"
+        style={{ width: 120 }}
+        autoFocus
+      />
+      <button onClick={handleSave} style={{ width: 22, height: 22, border: 'none', borderRadius: 5, background: '#059669', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+        <Icon name="Check" size={11} />
+      </button>
+      <button onClick={() => setEditing(false)} style={{ width: 22, height: 22, border: 'none', borderRadius: 5, background: '#f1f5f9', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+        <Icon name="X" size={11} />
+      </button>
+    </div>
+  );
 
   return (
-    <>
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        {/* Desktop Table */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="w-12 p-4">
-                  <Checkbox
-                    checked={isAllSelected}
-                    indeterminate={isIndeterminate}
-                    onChange={(e) => onSelectAll(e?.target?.checked)}
-                  />
-                </th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Images</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Vendor</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Category</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Price</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Auction Status</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Auction Dates</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {products?.map((product, index) => (
-                <tr key={`${product?.product_id}-${index}`} className="hover:bg-muted/50">
-                  <td className="p-4">
-                    <Checkbox
-                      checked={selectedProducts?.includes(product?.product_id)}
-                      onChange={(e) => {
-                        console.log('Product checkbox changed:', {
-                          productId: product?.product_id,
-                          productName: product?.name,
-                          checked: e.target.checked,
-                          isSelected: selectedProducts?.includes(product?.product_id)
-                        });
-                        onSelectProduct(product?.product_id, e?.target?.checked);
-                      }}
-                    />
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <ProductImage product={product} size="small" />
-                      <div>
-                        <p className="font-medium text-foreground">{product?.name}</p>
-                        <p className="text-sm text-muted-foreground">ID: {product?.product_id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewImages(product)}
-                      iconName="Images"
-                      iconPosition="left"
-                    >
-                      View ({getProductImages(product)?.length})
-                    </Button>
-                  </td>
-                  <td className="p-4">
-                    <div>
-                      <p className="font-medium text-foreground">{product?.seller || 'N/A'}</p>
-                      <p className="text-sm text-muted-foreground">{product?.sellerEmail || 'N/A'}</p>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-sm text-foreground">{product?.category || 'N/A'}</span>
-                  </td>
-                  <td className="p-4">
-                    <div>
-                      <p className="font-medium text-foreground">₹{product?.starting_price || 0}</p>
-                      {product?.bid_amount && (
-                        <p className="text-sm text-success">Current: ₹{product?.bid_amount}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-2">
-                      {getAuctionStatusBadge(product?.auctionstatus)}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleScheduleAuction(product)}
-                        className="p-1"
-                        title="Schedule Auction"
-                      >
-                        <Icon name="Calendar" size={14} />
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-muted-foreground">Start:</span>
-                        {editingCell === `${product?.product_id}-startDate` ? (
-                          <div className="flex items-center space-x-1">
-                            <input
-                              type="date"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e?.target?.value)}
-                              className="text-xs border border-border rounded px-1 py-0.5"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCellSave(product?.product_id, 'startDate')}
-                              className="p-0.5"
-                            >
-                              <Icon name="Check" size={12} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleCellCancel}
-                              className="p-0.5"
-                            >
-                              <Icon name="X" size={12} />
-                            </Button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleCellEdit(product?.product_id, 'startDate', product?.auction_start)}
-                            className="text-xs text-foreground hover:text-primary"
-                          >
-                            {formatDate(product?.auction_start)}
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-muted-foreground">End:</span>
-                        {editingCell === `${product?.product_id}-endDate` ? (
-                          <div className="flex items-center space-x-1">
-                            <input
-                              type="date"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e?.target?.value)}
-                              className="text-xs border border-border rounded px-1 py-0.5"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCellSave(product?.product_id, 'endDate')}
-                              className="p-0.5"
-                            >
-                              <Icon name="Check" size={12} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleCellCancel}
-                              className="p-0.5"
-                            >
-                              <Icon name="X" size={12} />
-                            </Button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleCellEdit(product?.product_id, 'endDate', product?.auction_end)}
-                            className="text-xs text-foreground hover:text-primary"
-                          >
-                            {formatDate(product?.auction_end)}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => onStatusToggle(product?.product_id)}
-                      className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        product?.isactive
-                          ? 'bg-success/10 text-success' :'bg-secondary/10 text-secondary'
-                      }`}
-                    >
-                      <div className={`w-2 h-2 rounded-full ${
-                        product?.isactive ? 'bg-success' : 'bg-secondary'
-                      }`} />
-                      <span>{product?.isactive ? 'Active' : 'Inactive'}</span>
-                    </button>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEditProduct(product?.product_id)}
-                        title="Edit Product"
-                      >
-                        <Icon name="Edit" size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewProduct(product)}
-                        title="View Product Details"
-                      >
-                        <Icon name="Eye" size={16} />
-                      </Button>
-                      <Button
-                        variant={canGoLive(product) ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => handleGoLive(product)}
-                        disabled={!canGoLive(product)}
-                        title={canGoLive(product) ? "Go Live with Video Stream" : "Product must be active with scheduled auction"}
-                        className={canGoLive(product) ? "bg-red-500 hover:bg-red-600 text-white" : ""}
-                      >
-                        <Icon name="Video" size={16} />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Mobile Cards */}
-        <div className="lg:hidden space-y-4 p-4">
-          {products?.map((product, index) => (
-            <div key={`${product?.product_id}-${index}`} className="bg-card border border-border rounded-lg p-4">
-              <div className="flex items-start space-x-3 mb-3">
-                <Checkbox
-                  checked={selectedProducts?.includes(product?.product_id)}
-                  onChange={(e) => {
-                    console.log('Product mobile checkbox changed:', {
-                      productId: product?.product_id,
-                      productName: product?.name,
-                      checked: e.target.checked,
-                      isSelected: selectedProducts?.includes(product?.product_id)
-                    });
-                    onSelectProduct(product?.product_id, e?.target?.checked);
-                  }}
-                />
-                <ProductImage product={product} size="medium" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground truncate">{product?.name}</h3>
-                  <p className="text-sm text-muted-foreground">ID: {product?.product_id}</p>
-                  <p className="text-sm text-muted-foreground">{product?.seller || 'N/A'}</p>
-                </div>
-              </div>
+    <button className="pt-date-read" onClick={() => { setVal(value || ''); setEditing(true); }}>
+      {fmtDate(value) ?? <span style={{ color: '#cbd5e1' }}>—</span>}
+    </button>
+  );
+};
 
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Category</p>
-                  <p className="text-sm font-medium">{product?.category || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Starting Price</p>
-                  <p className="text-sm font-medium">₹{product?.starting_price || 0}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Images</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewImages(product)}
-                    iconName="Images"
-                    iconPosition="left"
-                  >
-                    View ({getProductImages(product)?.length})
-                  </Button>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Auction</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleScheduleAuction(product)}
-                    iconName="Calendar"
-                    iconPosition="left"
-                  >
-                    Schedule
-                  </Button>
-                </div>
-              </div>
+/* ─── ProductAvatar ──────────────────────────────────────────────────── */
+const ProductAvatar = ({ product, size = 40, imgErrors, onError }) => {
+  const imgUrl = getMainImg(product);
+  const hasFail = imgErrors[product?.product_id];
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size <= 40 ? 10 : 12,
+      overflow: 'hidden', background: '#f1f5f9', flexShrink: 0,
+      border: '1px solid #e8edf2',
+    }}>
+      <img
+        src={imgUrl && !hasFail ? imgUrl : PH_IMG}
+        alt={product?.name}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        onError={() => onError(product?.product_id)}
+        loading="lazy"
+      />
+    </div>
+  );
+};
 
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  {getAuctionStatusBadge(product?.auctionstatus)}
-                </div>
-                <button
-                  onClick={() => onStatusToggle(product?.product_id)}
-                  className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                    product?.isactive
-                      ? 'bg-success/10 text-success' :'bg-secondary/10 text-secondary'
-                  }`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${
-                    product?.isactive ? 'bg-success' : 'bg-secondary'
-                  }`} />
-                  <span>{product?.isactive ? 'Active' : 'Inactive'}</span>
-                </button>
-              </div>
+/* ═══════════════════════════════════════════════════════════════════════
+   DESKTOP TABLE — uses CSS Grid (no <table>), fully contained, no scroll
+   XL: 1280px+
+   LG: 1024px-1279px
+   MD: 768px-1023px (Tablet - simplified view)
+   SM: <768px (Mobile cards)
+═══════════════════════════════════════════════════════════════════════ */
 
-              <div className="space-y-2 mb-3">
-                <div className="text-xs text-muted-foreground">
-                  <p>Start: {formatDate(product?.auction_start)}</p>
-                  <p>End: {formatDate(product?.auction_end)}</p>
-                </div>
-              </div>
+// XL Desktop grid - full columns
+const GRID_XL = '40px minmax(0,2fr) 70px minmax(0,1.3fr) minmax(0,0.9fr) 90px minmax(0,1.1fr) minmax(0,1.3fr) 110px 110px';
 
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEditProduct(product?.product_id)}
-                    title="Edit Product"
-                  >
-                    <Icon name="Edit" size={16} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewProduct(product)}
-                    title="View Product Details"
-                  >
-                    <Icon name="Eye" size={16} />
-                  </Button>
-                </div>
-                <Button
-                  variant={canGoLive(product) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleGoLive(product)}
-                  disabled={!canGoLive(product)}
-                  iconName="Video"
-                  iconPosition="left"
-                  className={canGoLive(product) ? "bg-red-500 hover:bg-red-600 text-white" : ""}
-                >
-                  Go Live
-                </Button>
-              </div>
+// Desktop/LG grid - slightly condensed
+const GRID_LG = '36px minmax(0,1.8fr) 60px minmax(0,1.2fr) minmax(0,0.8fr) 80px minmax(0,1fr) minmax(0,1.2fr) 100px 100px';
+
+// Default/fallback grid
+const GRID = GRID_XL;
+
+const DesktopTable = ({ products, selectedProducts, onSelectProduct, onSelectAll, onStatusToggle, onEditProduct, setGallery, setSched, setView, setLive, imgErrors, setImgError, onCellValueUpdate }) => {
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  const allSel = products.length > 0 && products.every(p => selectedProducts?.includes(p.product_id));
+  const indSel = products.length > 0 && products.some(p => selectedProducts?.includes(p.product_id)) && !allSel;
+
+  // Determine grid based on viewport
+  const getGrid = () => {
+    if (viewportWidth >= 1280) return GRID_XL;
+    if (viewportWidth >= 1024) return GRID_LG;
+    return GRID_LG; // Fallback to LG for tablet
+  };
+
+  // Listen for resize
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const currentGrid = getGrid();
+
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE CARDS
+═══════════════════════════════════════════════════════════════════════ */
+const MobileCards = ({ products, selectedProducts, onSelectProduct, onStatusToggle, onEditProduct, setGallery, setSched, setView, setLive, imgErrors, setImgError, statusFilter, onApprove, onReject }) => (
+  <div className="pt-mobile-view" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14 }}>
+    {products.map((p, idx) => {
+      const sel = selectedProducts?.includes(p.product_id);
+      return (
+        <div key={`m${p.product_id}${idx}`} className={`pt-card${sel ? ' sel' : ''}`}>
+
+          {/* Row 1: checkbox + avatar + name + price */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            <div style={{ paddingTop: 3, flexShrink: 0 }}>
+              <Checkbox checked={sel} onChange={e => onSelectProduct(p.product_id, e.target.checked)} />
             </div>
-          ))}
+            <ProductAvatar product={p} size={52} imgErrors={imgErrors} onError={id => setImgError(prev => ({ ...prev, [id]: true }))} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+              <p style={{ margin: '2px 0 3px', fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>#{p.product_id}</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.seller || '—'}</p>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>₹{(p.starting_price || 0).toLocaleString('en-IN')}</p>
+              {p.bid_amount && <p style={{ margin: '2px 0 0', fontSize: 10, color: '#059669', fontWeight: 700 }}>↑ ₹{p.bid_amount}</p>}
+            </div>
+          </div>
+
+          {/* Row 2: tags */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+            {p.category && <span style={{ padding: '3px 9px', borderRadius: 6, background: '#f1f5f9', fontSize: 11, fontWeight: 600, color: '#475569' }}>{p.category}</span>}
+            <AuctionBadge status={p.auctionstatus} />
+            <button className="pt-media" onClick={() => setGallery({ open: true, p })}>
+              <Icon name="Images" size={12} />{getImages(p).length}
+            </button>
+            {/* Hide Schedule Auction button for approved/pending/rejected pages */}
+            {!statusFilter && (
+              <button className="pt-cal" style={{ marginLeft: 'auto' }} onClick={() => setSched({ open: true, p })} title="Schedule Auction">
+                <Icon name="Calendar" size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Row 3: dates */}
+          {(p.auction_start || p.auction_end) && (
+            <div style={{ display: 'flex', gap: 20, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+              {[['Start', p.auction_start], ['End', p.auction_end]].map(([label, val]) => val ? (
+                <div key={label}>
+                  <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#374151' }}>{fmtDate(val)}</p>
+                </div>
+              ) : null)}
+            </div>
+          )}
+
+          {/* Row 4: status + actions */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Show rejection reason for rejected products */}
+            {statusFilter === 'rejected' && p.rejection_reason && (
+              <div style={{ marginBottom: 8, padding: '8px 12px', background: '#fef2f2', borderRadius: 8, width: '100%' }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rejection Reason</span>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#7f1d1d', fontWeight: 500 }}>{p.rejection_reason}</p>
+              </div>
+            )}
+            {/* Hide Active/Inactive toggle for approved/pending/rejected pages */}
+            {!statusFilter && (
+              <button className={`pt-status ${p.isactive ? 'on' : 'off'}`} onClick={() => onStatusToggle(p.product_id)}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                {p.isactive ? 'Active' : 'Inactive'}
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="pt-act" onClick={() => onEditProduct(p.product_id)}><Icon name="Pencil" size={14} /></button>
+              <button className="pt-act" onClick={() => setView({ open: true, p })}><Icon name="Eye" size={14} /></button>
+              {/* Hide Go Live button for approved/pending/rejected pages */}
+              {!statusFilter && (
+                <button className={`pt-act${canGoLive(p) ? ' pt-live' : ''}`} onClick={() => canGoLive(p) && setLive({ open: true, p })} disabled={!canGoLive(p)}><Icon name="Video" size={14} /></button>
+              )}
+              {/* Approve/Reject buttons for pending products (admin only) */}
+              {statusFilter === 'pending' && (
+                <>
+                  <button 
+                    className="pt-act" 
+                    onClick={() => onApprove && onApprove(p.product_id)}
+                    title="Approve"
+                    style={{ background: '#ecfdf5', borderColor: '#059669', color: '#059669' }}
+                  >
+                    <Icon name="Check" size={14} />
+                  </button>
+                  <button 
+                    className="pt-act" 
+                    onClick={() => onReject && onReject(p)}
+                    title="Reject"
+                    style={{ background: '#fef2f2', borderColor: '#dc2626', color: '#dc2626' }}
+                  >
+                    <Icon name="X" size={14} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
+      );
+    })}
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════
+    TABLET CARDS (768px - 1023px)
+═══════════════════════════════════════════════════════════════════════ */
+const TabletCards = ({ products, selectedProducts, onSelectProduct, onSelectAll, onStatusToggle, onEditProduct, setGallery, setSched, setView, setLive, imgErrors, setImgError, statusFilter, onApprove, onReject }) => {
+  const allSel = products.length > 0 && products.every(p => selectedProducts?.includes(p.product_id));
+  const indSel = products.length > 0 && products.some(p => selectedProducts?.includes(p.product_id)) && !allSel;
+
+  return (
+    <div className="pt-tablet-view" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16 }}>
+      {/* Select All Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 10, marginBottom: 4 }}>
+        <Checkbox checked={allSel} indeterminate={indSel} onChange={e => onSelectAll(e.target.checked)} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Select All</span>
+        <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{products.length} products</span>
       </div>
 
-      {/* Image Gallery Modal */}
+      {products.map((p, idx) => {
+        const sel = selectedProducts?.includes(p.product_id);
+        return (
+          <div key={`t${p.product_id}${idx}`} className={`pt-card${sel ? ' sel' : ''}`} style={{ padding: 14 }}>
+            {/* Main Row */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+              <div style={{ paddingTop: 2, flexShrink: 0 }}>
+                <Checkbox checked={sel} onChange={e => onSelectProduct(p.product_id, e.target.checked)} />
+              </div>
+              <ProductAvatar product={p} size={56} imgErrors={imgErrors} onError={id => setImgError(prev => ({ ...prev, [id]: true }))} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+                <p style={{ margin: '2px 0', fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>#{p.product_id}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.seller || '—'}</p>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>₹{(p.starting_price || 0).toLocaleString('en-IN')}</p>
+                {p.bid_amount && <p style={{ margin: '2px 0 0', fontSize: 10, color: '#059669', fontWeight: 700 }}>↑ ₹{p.bid_amount}</p>}
+              </div>
+            </div>
+
+            {/* Details Row */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid #f1f5f9' }}>
+              {p.category && <span style={{ padding: '3px 8px', borderRadius: 6, background: '#f1f5f9', fontSize: 11, fontWeight: 600, color: '#475569' }}>{p.category}</span>}
+              <AuctionBadge status={p.auctionstatus} />
+              <button className="pt-media" onClick={() => setGallery({ open: true, p })}>
+                <Icon name="Images" size={12} />{getImages(p).length}
+              </button>
+              {/* Hide Schedule Auction button for approved/pending/rejected pages */}
+              {!statusFilter && (
+                <button className="pt-cal" style={{ marginLeft: 'auto' }} onClick={() => setSched({ open: true, p })} title="Schedule Auction">
+                  <Icon name="Calendar" size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Footer Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* Show rejection reason for rejected products */}
+              {statusFilter === 'rejected' && p.rejection_reason && (
+                <div style={{ marginBottom: 8, padding: '8px 12px', background: '#fef2f2', borderRadius: 8, width: '100%' }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rejection Reason</span>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#7f1d1d', fontWeight: 500 }}>{p.rejection_reason}</p>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 12 }}>
+                {p.auction_start && (
+                  <div>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Start</span>
+                    <p style={{ margin: '2px 0 0', fontSize: 11, fontWeight: 600, color: '#374151' }}>{fmtDate(p.auction_start)}</p>
+                  </div>
+                )}
+                {p.auction_end && (
+                  <div>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>End</span>
+                    <p style={{ margin: '2px 0 0', fontSize: 11, fontWeight: 600, color: '#374151' }}>{fmtDate(p.auction_end)}</p>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Hide Active/Inactive toggle for approved/pending/rejected pages */}
+                {!statusFilter && (
+                  <button className={`pt-status ${p.isactive ? 'on' : 'off'}`} onClick={() => onStatusToggle(p.product_id)} style={{ padding: '4px 10px' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+                    {p.isactive ? 'Active' : 'Inactive'}
+                  </button>
+                )}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="pt-act" onClick={() => onEditProduct(p.product_id)}><Icon name="Pencil" size={12} /></button>
+                  <button className="pt-act" onClick={() => setView({ open: true, p })}><Icon name="Eye" size={12} /></button>
+                  {/* Hide Go Live button for approved/pending/rejected pages */}
+                  {!statusFilter && (
+                    <button className={`pt-act${canGoLive(p) ? ' pt-live' : ''}`} onClick={() => canGoLive(p) && setLive({ open: true, p })} disabled={!canGoLive(p)}><Icon name="Video" size={12} /></button>
+                  )}
+                  {/* Approve/Reject buttons for pending products (admin only) */}
+                  {statusFilter === 'pending' && (
+                    <>
+                      <button 
+                        className="pt-act" 
+                        onClick={() => onApprove && onApprove(p.product_id)}
+                        title="Approve"
+                        style={{ background: '#ecfdf5', borderColor: '#059669', color: '#059669' }}
+                      >
+                        <Icon name="Check" size={12} />
+                      </button>
+                      <button 
+                        className="pt-act" 
+                        onClick={() => onReject && onReject(p)}
+                        title="Reject"
+                        style={{ background: '#fef2f2', borderColor: '#dc2626', color: '#dc2626' }}
+                      >
+                        <Icon name="X" size={12} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MAIN EXPORT
+═══════════════════════════════════════════════════════════════════════ */
+const ProductTable = ({
+  products, onStatusToggle, onAuctionToggle, onEditProduct, onBulkAction,
+  selectedProducts, onSelectProduct, onSelectAll, onCellValueUpdate, onAuctionSchedule,
+  statusFilter, onApprove, onReject,
+}) => {
+  const [imgErrors, setImgError] = useState({});
+  const [gallery, setGallery]   = useState({ open: false, p: null });
+  const [sched, setSched]       = useState({ open: false, p: null });
+  const [view, setView]         = useState({ open: false, p: null });
+  const [live, setLive]         = useState({ open: false, p: null });
+
+  const shared = { products, selectedProducts, onSelectProduct, onStatusToggle, onEditProduct, setGallery, setSched, setView, setLive, imgErrors, setImgError, statusFilter, onApprove, onReject };
+
+  return (
+    <div className="pt-root" style={{ width: '100%' }}>
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
+
+      {!products?.length ? (
+        <div className="pt-empty">
+          <div style={{ width: 68, height: 68, borderRadius: 18, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+            <Icon name="Package" size={30} color="#94a3b8" />
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#64748b', margin: '0 0 6px' }}>No products found</p>
+          <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Adjust filters or add a new product</p>
+        </div>
+      ) : (
+        <>
+          <DesktopTable {...shared} onSelectAll={onSelectAll} onCellValueUpdate={onCellValueUpdate} />
+          <TabletCards {...shared} onSelectAll={onSelectAll} />
+          <MobileCards {...shared} />
+        </>
+      )}
+
       <ImageGalleryModal
-        isOpen={imageGalleryModal?.isOpen}
-        onClose={() => setImageGalleryModal({ isOpen: false, product: null })}
-        images={imageGalleryModal?.product ? getProductImages(imageGalleryModal?.product) : []}
-        title={`${imageGalleryModal?.product?.name || 'Product'} - Images`}
+        isOpen={gallery.open}
+        onClose={() => setGallery({ open: false, p: null })}
+        images={gallery.p ? getImages(gallery.p) : []}
+        title={`${gallery.p?.name || 'Product'} — Images`}
       />
-
-      {/* Schedule Auction Modal */}
       <ScheduleAuctionModal
-        isOpen={scheduleModal?.isOpen}
-        onClose={() => setScheduleModal({ isOpen: false, product: null })}
-        product={scheduleModal?.product}
-        onSchedule={handleAuctionScheduled}
+        isOpen={sched.open}
+        onClose={() => setSched({ open: false, p: null })}
+        product={sched.p}
+        onSchedule={async d => { if (onAuctionSchedule) await onAuctionSchedule(d); setSched({ open: false, p: null }); }}
       />
-
-      {/* Product View Modal */}
-      <ProductViewModal
-        isOpen={viewModal?.isOpen}
-        onClose={() => setViewModal({ isOpen: false, product: null })}
-        product={viewModal?.product}
-      />
-
-      {/* Go Live Modal */}
-      <GoLiveModal
-        isOpen={goLiveModal?.isOpen}
-        onClose={() => setGoLiveModal({ isOpen: false, product: null })}
-        product={goLiveModal?.product}
-        onGoLive={handleLiveStreamStart}
-      />
-    </>
+      <ProductViewModal isOpen={view.open} onClose={() => setView({ open: false, p: null })} product={view.p} />
+      <GoLiveModal isOpen={live.open} onClose={() => setLive({ open: false, p: null })} product={live.p} onGoLive={() => {}} />
+    </div>
   );
 };
 

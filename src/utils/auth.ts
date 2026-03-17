@@ -1,7 +1,8 @@
 import Cookies from 'js-cookie';
 
 export const getToken = (): string | null => {
-  return Cookies.get('authToken') || null;
+  // Check multiple token sources for consistency with Header component
+  return Cookies.get('authToken') || Cookies.get('accessToken') || localStorage.getItem('authToken') || null;
 };
 
 export const getUserRole = (): string | null => {

@@ -96,6 +96,9 @@ const LoginForm = () => {
         );
       }
 
+      // ✅ Set authenticated flag
+      localStorage.setItem('isAuthenticated', 'true');
+
       // ✅ Navigate to dashboard
       console.log('Redirecting to dashboard...');
       navigate('/vendor-analytics', { replace: true });

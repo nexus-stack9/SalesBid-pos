@@ -22,7 +22,11 @@ const ProtectedRoute = ({
     // Perform auth checks
     const token = getToken();
     const isAuthenticatedFlag = localStorage.getItem('isAuthenticated') === 'true';
-    const authStatus = !!token && isAuthenticatedFlag;
+    
+    // Allow authentication if either:
+    // 1. Both token and isAuthenticated flag exist (new login flow)
+    // 2. Just token exists (legacy login - for existing users)
+    const authStatus = !!token && (isAuthenticatedFlag || localStorage.getItem('authToken'));
     
     setIsAuthenticated(authStatus);
 

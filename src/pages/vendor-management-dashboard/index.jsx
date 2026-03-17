@@ -10,8 +10,31 @@ import VendorPagination from './components/VendorPagination';
 import { getAllVendors, updateVendorStatus, updateVendorActiveStatus } from '../../services/posCrud';
 import { deleteRecord } from '../../services/crudService';
 
+/* ─── Design tokens ──────────────────────────────────────────────────── */
+const TOKEN = {
+  accent: '#2563eb',
+  accentLight: '#eff6ff',
+  danger: '#dc2626',
+  dangerLight: '#fef2f2',
+  border: '#e2e8f0',
+  cardShadow: '0 1px 3px 0 rgba(0,0,0,.07), 0 1px 2px -1px rgba(0,0,0,.07)',
+};
+
+/* ─── Global styles ───────────────────────────────────────────────────── */
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+    .vmd-root * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+    .vmd-root { background: #f1f5f9; min-height: 100vh; }
+    .spinner { animation: spin .9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  `}</style>
+);
+
+/* ════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════════════════════ */
 const VendorManagementDashboard = () => {
-  // State management
   const [activeTab, setActiveTab] = useState('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -24,459 +47,155 @@ const VendorManagementDashboard = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Filter and sort vendors
+  /* ── Filter + sort ──────────────────────────────────────────────────── */
   const filteredAndSortedVendors = useMemo(() => {
     let filtered = vendors?.filter(vendor => {
       if (vendor?.approval_status !== activeTab) return false;
-
       if (searchQuery) {
-        const query = searchQuery?.toLowerCase();
-        if (!vendor?.business_name?.toLowerCase()?.includes(query) &&
-            !vendor?.vendor_name?.toLowerCase()?.includes(query) &&
-            !vendor?.email?.toLowerCase()?.includes(query)) {
-          return false;
-        }
+        const q = searchQuery.toLowerCase();
+        if (!vendor?.business_name?.toLowerCase()?.includes(q) &&
+            !vendor?.vendor_name?.toLowerCase()?.includes(q) &&
+            !vendor?.email?.toLowerCase()?.includes(q)) return false;
       }
-
-      if (selectedCategory !== 'all' && vendor?.items_category?.toLowerCase() !== selectedCategory) {
-        return false;
-      }
-
+      if (selectedCategory !== 'all' && vendor?.items_category?.toLowerCase() !== selectedCategory) return false;
       if (selectedDateRange !== 'all') {
         const vendorDate = new Date(vendor.created_at || vendor.registrationDate);
-        const now = new Date();
-        const daysDiff = Math.floor((now - vendorDate) / (1000 * 60 * 60 * 24));
-
-        switch (selectedDateRange) {
-          case 'today':
-            if (daysDiff > 0) return false;
-            break;
-          case 'week':
-            if (daysDiff > 7) return false;
-            break;
-          case 'month':
-            if (daysDiff > 30) return false;
-            break;
-          case 'quarter':
-            if (daysDiff > 90) return false;
-            break;
-          case 'year':
-            if (daysDiff > 365) return false;
-            break;
-        }
+        const daysDiff = Math.floor((new Date() - vendorDate) / (1000 * 60 * 60 * 24));
+        const limits = { today: 0, week: 7, month: 30, quarter: 90, year: 365 };
+        if (daysDiff > (limits[selectedDateRange] ?? Infinity)) return false;
       }
-
       return true;
     });
 
     filtered?.sort((a, b) => {
-      let aValue = a?.[sortConfig?.field];
-      let bValue = b?.[sortConfig?.field];
-
-      if (sortConfig?.field === 'created_date_time' || sortConfig?.field === 'created_at') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      } else if (typeof aValue === 'string') {
-        aValue = aValue?.toLowerCase();
-        bValue = bValue?.toLowerCase();
-      }
-
-      if (aValue < bValue) return sortConfig?.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig?.direction === 'asc' ? 1 : -1;
+      let aVal = a?.[sortConfig.field], bVal = b?.[sortConfig.field];
+      if (['created_date_time', 'created_at'].includes(sortConfig.field)) { aVal = new Date(aVal); bVal = new Date(bVal); }
+      else if (typeof aVal === 'string') { aVal = aVal.toLowerCase(); bVal = bVal?.toLowerCase(); }
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
 
     return filtered;
   }, [vendors, activeTab, searchQuery, selectedCategory, selectedDateRange, sortConfig]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredAndSortedVendors?.length / itemsPerPage);
-  const paginatedVendors = filteredAndSortedVendors?.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedVendors = filteredAndSortedVendors?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Status counts
-  const statusCounts = useMemo(() => {
-    return {
-      pending: vendors?.filter(v => v?.approval_status === 'pending')?.length || 0,
-      approved: vendors?.filter(v => v?.approval_status === 'approved')?.length || 0,
-      rejected: vendors?.filter(v => v?.approval_status === 'rejected')?.length || 0,
-    };
-  }, [vendors]);
+  const statusCounts = useMemo(() => ({
+    pending: vendors?.filter(v => v?.approval_status === 'pending')?.length || 0,
+    approved: vendors?.filter(v => v?.approval_status === 'approved')?.length || 0,
+    rejected: vendors?.filter(v => v?.approval_status === 'rejected')?.length || 0,
+  }), [vendors]);
 
-  // Fetch all vendors
+  /* ── Data fetching ──────────────────────────────────────────────────── */
   const fetchAllVendors = async () => {
-    setIsLoading(true);
-    setError(null);
+    setIsLoading(true); setError(null);
     try {
-      console.log('📡 Fetching all vendors...');
       const response = await getAllVendors();
-      console.log("✅ Fetched vendors:", response?.data?.length, "vendors");
       setVendors(response?.data || []);
       return response?.data || [];
     } catch (err) {
-      if (err.response?.status === 204) {
-        console.log('ℹ️ No vendors found (204)');
-        setVendors([]);
-        return [];
-      } else {
-        console.error('❌ Failed to load vendors:', err);
-        setError("Failed to load vendors");
-        return [];
-      }
-    } finally {
-      setIsLoading(false);
-    }
+      if (err.response?.status === 204) { setVendors([]); return []; }
+      setError("Failed to load vendors"); return [];
+    } finally { setIsLoading(false); }
   };
 
   const handleVendorActiveToggle = async (vendorId, newStatus) => {
-    console.log('🔵 handleVendorActiveToggle called:', { vendorId, newStatus });
-
-    setVendors(prevVendors => {
-      const updated = prevVendors?.map(vendor =>
-        vendor?.vendor_id === vendorId
-          ? { ...vendor, isactive: newStatus }
-          : vendor
-      );
-      console.log('🔄 Optimistic update applied');
-      return updated;
-    });
-
-    try {
-      console.log('📡 Refreshing from server...');
-      await fetchAllVendors();
-      console.log('✅ Server refresh completed');
-    } catch (error) {
-      console.error('❌ Failed to refresh from server:', error);
-      setVendors(prevVendors => {
-        const reverted = prevVendors?.map(vendor =>
-          vendor?.vendor_id === vendorId
-            ? { ...vendor, isactive: !newStatus }
-            : vendor
-        );
-        console.log('⏪ Reverted optimistic update due to error');
-        return reverted;
-      });
-    }
+    setVendors(prev => prev.map(v => v?.vendor_id === vendorId ? { ...v, isactive: newStatus } : v));
+    try { await fetchAllVendors(); }
+    catch { setVendors(prev => prev.map(v => v?.vendor_id === vendorId ? { ...v, isactive: !newStatus } : v)); }
   };
 
-  const handleTabChange = (tab) => {
-    console.log('🔵 Tab changed to:', tab);
-    setActiveTab(tab);
-    setCurrentPage(1);
-    setSelectedVendors([]);
-  };
+  const handleTabChange = (tab) => { setActiveTab(tab); setCurrentPage(1); setSelectedVendors([]); };
 
   const handleStatusChange = async (vendorId, newStatus, justification) => {
-    console.log('🔵 handleStatusChange called:', { vendorId, newStatus, justification });
-    
     try {
       await updateVendorStatus(vendorId, newStatus, justification);
-      console.log('✅ Vendor status updated in database');
-      
       await fetchAllVendors();
-      console.log('✅ Vendors refreshed from database');
-
-    } catch (error) {
-      console.error("❌ Failed to update vendor status:", error);
-      alert("Error updating vendor status. Please try again.");
-    }
+    } catch { alert("Error updating vendor status. Please try again."); }
   };
 
   const handleBulkSelect = (vendorId, isSelected) => {
-    console.log('🔵 Bulk select:', { vendorId, isSelected });
-    if (isSelected) {
-      setSelectedVendors(prev => [...prev, vendorId]);
-    } else {
-      setSelectedVendors(prev => prev?.filter(id => id !== vendorId));
-    }
+    setSelectedVendors(prev => isSelected ? [...prev, vendorId] : prev.filter(id => id !== vendorId));
   };
 
   const handleSelectAll = (isSelected) => {
-    console.log('🔵 Select all:', { isSelected, count: paginatedVendors?.length });
-    if (isSelected) {
-      setSelectedVendors(paginatedVendors?.map(v => v?.vendor_id));
-    } else {
-      setSelectedVendors([]);
-    }
+    setSelectedVendors(isSelected ? paginatedVendors?.map(v => v?.vendor_id) : []);
   };
 
-  const handleBulkApprove = async () => {
-    if (selectedVendors.length === 0) {
-      alert('Please select vendors to approve');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to approve ${selectedVendors.length} vendor(s)?`
-    );
-    
-    if (!confirmed) return;
-
+  const runBulk = async (label, fn) => {
+    if (!selectedVendors.length) { alert(`Please select vendors to ${label}`); return; }
+    if (!window.confirm(`Are you sure you want to ${label} ${selectedVendors.length} vendor(s)?`)) return;
     setIsLoading(true);
     try {
-      console.log('🔵 Bulk approving vendors:', selectedVendors);
-
-      const results = await Promise.allSettled(
-        selectedVendors.map(vendorId =>
-          updateVendorStatus(vendorId, 'approved', 'Bulk approved by admin')
-        )
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      console.log(`✅ Bulk approve completed: ${successful} successful, ${failed} failed`);
-
+      const results = await Promise.allSettled(selectedVendors.map(fn));
+      const ok = results.filter(r => r.status === 'fulfilled').length;
+      const fail = results.filter(r => r.status === 'rejected').length;
       await fetchAllVendors();
       setSelectedVendors([]);
-
-      if (failed > 0) {
-        alert(`Approved ${successful} vendor(s). Failed to approve ${failed} vendor(s).`);
-      } else {
-        alert(`Successfully approved ${successful} vendor(s)`);
-      }
-    } catch (error) {
-      console.error('❌ Error bulk approving vendors:', error);
-      alert('Failed to approve vendors. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+      alert(fail > 0 ? `${label} ${ok} vendor(s). Failed: ${fail}.` : `Successfully ${label}d ${ok} vendor(s).`);
+    } catch { alert(`Failed to ${label} vendors.`); }
+    finally { setIsLoading(false); }
   };
 
-  const handleBulkReject = async () => {
-    if (selectedVendors.length === 0) {
-      alert('Please select vendors to reject');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to reject ${selectedVendors.length} vendor(s)?`
-    );
-    
-    if (!confirmed) return;
-
-    setIsLoading(true);
-    try {
-      console.log('🔵 Bulk rejecting vendors:', selectedVendors);
-
-      const results = await Promise.allSettled(
-        selectedVendors.map(vendorId =>
-          updateVendorStatus(vendorId, 'rejected', 'Bulk rejected by admin')
-        )
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      console.log(`✅ Bulk reject completed: ${successful} successful, ${failed} failed`);
-
-      await fetchAllVendors();
-      setSelectedVendors([]);
-
-      if (failed > 0) {
-        alert(`Rejected ${successful} vendor(s). Failed to reject ${failed} vendor(s).`);
-      } else {
-        alert(`Successfully rejected ${successful} vendor(s)`);
-      }
-    } catch (error) {
-      console.error('❌ Error bulk rejecting vendors:', error);
-      alert('Failed to reject vendors. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBulkActivate = async () => {
-    if (selectedVendors.length === 0) {
-      alert('Please select vendors to activate');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to activate ${selectedVendors.length} vendor(s)?`
-    );
-    
-    if (!confirmed) return;
-
-    setIsLoading(true);
-    try {
-      console.log('🔵 Bulk activating vendors:', selectedVendors);
-
-      const results = await Promise.allSettled(
-        selectedVendors.map(vendorId =>
-          updateVendorActiveStatus(vendorId, true)
-        )
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      console.log(`✅ Bulk activate completed: ${successful} successful, ${failed} failed`);
-
-      await fetchAllVendors();
-      setSelectedVendors([]);
-
-      if (failed > 0) {
-        alert(`Activated ${successful} vendor(s). Failed to activate ${failed} vendor(s).`);
-      } else {
-        alert(`Successfully activated ${successful} vendor(s)`);
-      }
-    } catch (error) {
-      console.error('❌ Error bulk activating vendors:', error);
-      alert('Failed to activate vendors. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBulkDeactivate = async () => {
-    if (selectedVendors.length === 0) {
-      alert('Please select vendors to deactivate');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Are you sure you want to deactivate ${selectedVendors.length} vendor(s)?`
-    );
-    
-    if (!confirmed) return;
-
-    setIsLoading(true);
-    try {
-      console.log('🔵 Bulk deactivating vendors:', selectedVendors);
-
-      const results = await Promise.allSettled(
-        selectedVendors.map(vendorId =>
-          updateVendorActiveStatus(vendorId, false)
-        )
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      console.log(`✅ Bulk deactivate completed: ${successful} successful, ${failed} failed`);
-
-      await fetchAllVendors();
-      setSelectedVendors([]);
-
-      if (failed > 0) {
-        alert(`Deactivated ${successful} vendor(s). Failed to deactivate ${failed} vendor(s).`);
-      } else {
-        alert(`Successfully deactivated ${successful} vendor(s)`);
-      }
-    } catch (error) {
-      console.error('❌ Error bulk deactivating vendors:', error);
-      alert('Failed to deactivate vendors. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  const handleBulkApprove = () => runBulk('approve', id => updateVendorStatus(id, 'approved', 'Bulk approved by admin'));
+  const handleBulkReject = () => runBulk('reject', id => updateVendorStatus(id, 'rejected', 'Bulk rejected by admin'));
+  const handleBulkActivate = () => runBulk('activate', id => updateVendorActiveStatus(id, true));
+  const handleBulkDeactivate = () => runBulk('deactivate', id => updateVendorActiveStatus(id, false));
   const handleBulkDelete = async () => {
-    if (selectedVendors.length === 0) {
-      alert('Please select vendors to delete');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `⚠️ Are you sure you want to DELETE ${selectedVendors.length} vendor(s)? This action cannot be undone!`
-    );
-    
-    if (!confirmed) return;
-
+    if (!selectedVendors.length) { alert('Please select vendors to delete'); return; }
+    if (!window.confirm(`⚠️ DELETE ${selectedVendors.length} vendor(s)? This cannot be undone!`)) return;
     setIsLoading(true);
     try {
-      console.log('🔵 Bulk deleting vendors:', selectedVendors);
-
-      const results = await Promise.allSettled(
-        selectedVendors.map(vendorId =>
-          deleteRecord('vendorForm', vendorId)
-        )
-      );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      console.log(`✅ Bulk delete completed: ${successful} successful, ${failed} failed`);
-
+      const results = await Promise.allSettled(selectedVendors.map(id => deleteRecord('vendorForm', id)));
+      const ok = results.filter(r => r.status === 'fulfilled').length;
+      const fail = results.filter(r => r.status === 'rejected').length;
       await fetchAllVendors();
       setSelectedVendors([]);
-
-      if (failed > 0) {
-        alert(`Deleted ${successful} vendor(s). Failed to delete ${failed} vendor(s).`);
-      } else {
-        alert(`Successfully deleted ${successful} vendor(s)`);
-      }
-    } catch (error) {
-      console.error('❌ Error bulk deleting vendors:', error);
-      alert('Failed to delete vendors. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+      alert(fail > 0 ? `Deleted ${ok}. Failed: ${fail}.` : `Deleted ${ok} vendor(s).`);
+    } catch { alert('Failed to delete vendors.'); }
+    finally { setIsLoading(false); }
   };
 
-  const handleClearFilters = () => {
-    setSearchQuery('');
-    setSelectedCategory('all');
-    setSelectedDateRange('all');
-    setCurrentPage(1);
-  };
+  const handleClearFilters = () => { setSearchQuery(''); setSelectedCategory('all'); setSelectedDateRange('all'); setCurrentPage(1); };
+  const handlePageChange = (page) => { setCurrentPage(page); setSelectedVendors([]); };
+  const handleItemsPerPageChange = (n) => { setItemsPerPage(n); setCurrentPage(1); setSelectedVendors([]); };
+  const handleSort = (cfg) => { setSortConfig(cfg); setCurrentPage(1); };
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-    setSelectedVendors([]);
-  };
+  useEffect(() => { fetchAllVendors(); }, []);
+  useEffect(() => { setSelectedVendors([]); }, [activeTab]);
 
-  const handleItemsPerPageChange = (newItemsPerPage) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
-    setSelectedVendors([]);
-  };
-
-  const handleSort = (newSortConfig) => {
-    setSortConfig(newSortConfig);
-    setCurrentPage(1);
-  };
-
-  useEffect(() => {
-    fetchAllVendors();
-  }, []);
-
-  useEffect(() => {
-    setSelectedVendors([]);
-  }, [activeTab]);
-
+  /* ── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="vmd-root">
+      <GlobalStyles />
       <Header />
-      <main className="pt-16">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+      <main style={{ paddingTop: 64 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 24px 48px' }}>
           <Breadcrumb />
-          
-          {/* Enhanced Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
+
+          {/* Page header */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 48, height: 48, background: TOKEN.accent, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Users size={24} color="#fff" />
+              </div>
               <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-                  Vendor Management Dashboard
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0, letterSpacing: '-0.4px' }}>
+                  Vendor Management
                 </h1>
-                <p className="text-muted-foreground text-lg">
+                <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
                   Manage vendor onboarding, approvals, and status across your marketplace
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          <VendorStatusTabs
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            counts={statusCounts}
-          />
+          {/* Status tabs */}
+          <VendorStatusTabs activeTab={activeTab} onTabChange={handleTabChange} counts={statusCounts} />
 
-          {/* Search and Filters */}
+          {/* Search + filters */}
           <VendorSearchFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -488,7 +207,7 @@ const VendorManagementDashboard = () => {
             resultsCount={filteredAndSortedVendors?.length}
           />
 
-          {/* Bulk Actions */}
+          {/* Bulk actions */}
           <BulkActionsToolbar
             selectedCount={selectedVendors?.length}
             activeTab={activeTab}
@@ -500,35 +219,47 @@ const VendorManagementDashboard = () => {
             onClearSelection={() => setSelectedVendors([])}
           />
 
-          {/* Loading/Error/Table */}
+          {/* Loading / Error / Table */}
           {isLoading ? (
-            <div className="flex items-center justify-center py-20 bg-white rounded-2xl shadow-lg">
-              <div className="text-center">
-                <div className="relative">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-blue-600 mx-auto mb-4"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Users className="text-blue-600" size={24} />
-                  </div>
-                </div>
-                <p className="text-gray-600 font-medium">Loading vendors...</p>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '64px 24px', background: '#fff', borderRadius: 14,
+              border: `1px solid ${TOKEN.border}`, boxShadow: TOKEN.cardShadow,
+            }}>
+              <div style={{ position: 'relative', width: 52, height: 52, marginBottom: 18 }}>
+                <svg className="spinner" viewBox="0 0 52 52" width={52} height={52}>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+                  <circle cx="26" cy="26" r="22" fill="none" stroke={TOKEN.accent} strokeWidth="4" strokeDasharray="34 100" strokeLinecap="round" />
+                </svg>
+                <Users size={18} color={TOKEN.accent} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
               </div>
+              <p style={{ color: '#475569', fontWeight: 600, fontSize: 14, margin: 0 }}>Loading vendors…</p>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UserX className="text-red-600" size={32} />
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: '56px 24px', background: TOKEN.dangerLight, borderRadius: 14,
+              border: `1px solid #fecaca`, boxShadow: TOKEN.cardShadow,
+            }}>
+              <div style={{ width: 52, height: 52, background: '#fee2e2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <UserX size={24} color={TOKEN.danger} />
               </div>
-              <p className="text-red-600 font-medium text-lg">{error}</p>
+              <p style={{ color: TOKEN.danger, fontWeight: 600, fontSize: 14, marginBottom: 16 }}>{error}</p>
               <button
                 onClick={fetchAllVendors}
-                className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                style={{ padding: '9px 22px', background: TOKEN.danger, color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
               >
                 Try Again
               </button>
             </div>
           ) : (
             <>
-              <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 border border-gray-100 overflow-hidden">
+              <div style={{
+                background: '#fff', borderRadius: 14,
+                border: `1px solid ${TOKEN.border}`,
+                boxShadow: TOKEN.cardShadow,
+                overflow: 'hidden',
+              }}>
                 <VendorTable
                   vendors={paginatedVendors}
                   onStatusChange={handleStatusChange}
@@ -540,8 +271,7 @@ const VendorManagementDashboard = () => {
                   onVendorActiveToggle={handleVendorActiveToggle}
                 />
               </div>
-
-              <div className="mt-6">
+              <div style={{ marginTop: 20 }}>
                 <VendorPagination
                   currentPage={currentPage}
                   totalPages={totalPages}
