@@ -7,6 +7,8 @@ import Layout from "./components/ui/Layout"; // Update this import path
 
 import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/login";
+import ForgotPassword from "./pages/forgot-password";
+import OTPVerify from "./pages/otp-verify";
 import VendorManagementDashboard from "./pages/vendor-management-dashboard";
 import OrderManagementSystem from "./pages/order-management-system";
 import ProductCatalogManagement from "./pages/product-catalog-management";
@@ -29,6 +31,8 @@ const Routes = () => {
           {/* Public Routes - No Sidebar */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/otp-verify" element={<OTPVerify />} />
 
            {/* Public route for live stream viewing */}
           <Route path="/live/:productId" element={<LiveViewerPage />} />

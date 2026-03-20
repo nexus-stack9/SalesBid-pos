@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/AppIcon';
 import Button from '../components/ui/Button';
 import Cookies from 'js-cookie';
+import CryptoJS from 'crypto-js';
+
+const encryptPassword = (password) => {
+  const secretKey = import.meta.env.VITE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('Missing VITE_SECRET_KEY for password encryption');
+  }
+  return CryptoJS.AES.encrypt(password, secretKey).toString();
+};
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -214,18 +223,40 @@ const Profile = () => {
     setIsSaving(true);
     
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const token = Cookies.get('authToken') || Cookies.get('accessToken');
       
+      const encryptedCurrentPassword = encryptPassword(passwordData.currentPassword);
+      const encryptedNewPassword = encryptPassword(passwordData.newPassword);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/auth/vendor-password/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          currentPassword: encryptedCurrentPassword,
+          newPassword: encryptedNewPassword,
+          vendorId: userData?.vendorId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to change password');
+      }
+
       setShowPasswordModal(false);
       setPasswordData({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       });
-      alert('Password updated successfully!');
+      alert('Password changed successfully!');
     } catch (error) {
       console.error('Error updating password:', error);
-      alert('Failed to update password');
+      alert(error.message || 'Failed to change password');
     } finally {
       setIsSaving(false);
     }
