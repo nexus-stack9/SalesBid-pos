@@ -3,8 +3,9 @@ import Icon from '../../../components/AppIcon';
 
 const OrderProgressTracker = ({ currentStatus, orderId, onStatusUpdate }) => {
   const progressSteps = [
-    { key: 'pending', label: 'Pending', icon: 'Clock' },
-    { key: 'confirmed', label: 'Confirmed', icon: 'CheckCircle' },
+    { key: 'order_placed', label: 'Order Placed', icon: 'FileText' },
+    { key: 'pending_payment', label: 'Pending Payment', icon: 'Clock' },
+    { key: 'active', label: 'Active', icon: 'CheckCircle' },
     { key: 'processing', label: 'Processing', icon: 'Package' },
     { key: 'shipped', label: 'Shipped', icon: 'Truck' },
     { key: 'delivered', label: 'Delivered', icon: 'Home' }

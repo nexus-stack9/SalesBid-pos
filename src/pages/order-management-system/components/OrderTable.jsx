@@ -21,13 +21,13 @@ const OrderTable = ({
   const [dropdownOpen, setDropdownOpen] = useState(null);
 
   const statusOptions = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'order_placed', label: 'Order Placed' },
+    { value: 'pending_payment', label: 'Pending Payment' },
+    { value: 'active', label: 'Active' },
     { value: 'processing', label: 'Processing' },
     { value: 'shipped', label: 'Shipped' },
     { value: 'delivered', label: 'Delivered' },
-    { value: 'cancelled', label: 'Cancelled' },
-    { value: 'refunded', label: 'Refunded' }
+    { value: 'cancelled', label: 'Cancelled' }
   ];
 
   const formatDate = (date) => {
@@ -107,58 +107,29 @@ const OrderTable = ({
         iconName="MoreHorizontal"
       />
       {dropdownOpen === orderId && (
-        <div className="absolute right-0 top-8 w-48 bg-card border border-border rounded-lg shadow-lg z-10">
-          <div className="py-1">
+        <div className="absolute right-0 top-8 w-52 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
+          <div className="py-2">
             <button
               onClick={() => handleActionClick(orderId, 'view')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
             >
-              <Icon name="Eye" size={14} />
+              <Icon name="Eye" size={16} />
               <span>View Details</span>
             </button>
-            <button
-              onClick={() => handleActionClick(orderId, 'edit')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              <Icon name="Edit" size={14} />
-              <span>Edit Order</span>
-            </button>
-            <button
-              onClick={() => handleActionClick(orderId, 'duplicate')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              <Icon name="Copy" size={14} />
-              <span>Duplicate</span>
-            </button>
-            <div className="border-t border-border my-1"></div>
+            <div className="border-t border-gray-100 my-1"></div>
             <button
               onClick={() => handleActionClick(orderId, 'print')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
             >
-              <Icon name="Printer" size={14} />
+              <Icon name="Printer" size={16} />
               <span>Print Order</span>
             </button>
             <button
               onClick={() => handleActionClick(orderId, 'export')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
             >
-              <Icon name="Download" size={14} />
+              <Icon name="Download" size={16} />
               <span>Export</span>
-            </button>
-            <div className="border-t border-border my-1"></div>
-            <button
-              onClick={() => handleActionClick(orderId, 'archive')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted"
-            >
-              <Icon name="Archive" size={14} />
-              <span>Archive</span>
-            </button>
-            <button
-              onClick={() => handleActionClick(orderId, 'delete')}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-destructive hover:bg-muted"
-            >
-              <Icon name="Trash2" size={14} />
-              <span>Delete</span>
             </button>
           </div>
         </div>

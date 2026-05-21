@@ -86,19 +86,29 @@ const OrderManagementSystem = () => {
         image: order.image_path || 'https://via.placeholder.com/400',
         quantity: order.quantity || 1
       },
-      items: order.bids ? JSON.parse(order.bids).map(bid => ({
-        name: order.product_name || order.name,
-        image: order.image_path || 'https://via.placeholder.com/400',
-        vendor: order.seller || order.seller_name || 'N/A',
-        quantity: 1,
-        price: order.amount || 0
-      })) : [{
-        name: order.product_name || order.name || 'Product',
-        image: order.image_path || 'https://via.placeholder.com/400',
-        vendor: order.seller || order.seller_name || 'N/A',
-        quantity: order.quantity || 1,
-        price: order.amount || 0
-      }],
+      items: (() => {
+        let bids = [];
+        if (order.bids) {
+          if (Array.isArray(order.bids)) {
+            bids = order.bids;
+          } else if (typeof order.bids === 'string') {
+            try { bids = JSON.parse(order.bids); } catch { bids = []; }
+          }
+        }
+        return bids.length > 0 ? bids.map(bid => ({
+          name: order.product_name || order.name,
+          image: order.image_path || 'https://via.placeholder.com/400',
+          vendor: order.seller || order.seller_name || 'N/A',
+          quantity: 1,
+          price: order.amount || 0
+        })) : [{
+          name: order.product_name || order.name || 'Product',
+          image: order.image_path || 'https://via.placeholder.com/400',
+          vendor: order.seller || order.seller_name || 'N/A',
+          quantity: order.quantity || 1,
+          price: order.amount || 0
+        }];
+      })(),
       subtotal: order.amount || 0,
       shipping: 0,
       tax: 0,
@@ -132,20 +142,25 @@ const OrderManagementSystem = () => {
 
   const mapOrderStatus = (dbStatus) => {
     const statusMap = {
-      'pending': 'pending',
-      'confirmed': 'confirmed',
+      'order_placed': 'order_placed',
+      'pending_payment': 'pending_payment',
+      'active': 'active',
       'processing': 'processing',
       'shipped': 'shipped',
+      'delivered': 'delivered',
       'completed': 'delivered',
       'cancelled': 'cancelled',
+      'pending': 'pending',
+      'confirmed': 'confirmed',
       'refunded': 'refunded'
     };
-    return statusMap[dbStatus?.toLowerCase()] || 'pending';
+    return statusMap[dbStatus?.toLowerCase()] || 'order_placed';
   };
 
   const generateTimeline = (order) => {
     const timeline = [];
     const orderDate = new Date(order.order_date);
+    const status = order.order_status?.toLowerCase();
 
     timeline.push({
       action: 'Order placed',
@@ -153,41 +168,50 @@ const OrderManagementSystem = () => {
       note: 'Order created successfully'
     });
 
-    if (order.order_status === 'confirmed' || order.order_status === 'processing' || 
-        order.order_status === 'shipped' || order.order_status === 'completed') {
+    if (status === 'pending_payment' || status === 'active' || status === 'processing' ||
+        status === 'shipped' || status === 'delivered' || status === 'completed') {
       timeline.push({
-        action: 'Order confirmed',
-        timestamp: new Date(orderDate.getTime() + 30 * 60000), // 30 mins after
-        note: 'Payment confirmed'
+        action: 'Payment pending',
+        timestamp: new Date(orderDate.getTime() + 30 * 60000),
+        note: 'Awaiting payment confirmation'
       });
     }
 
-    if (order.order_status === 'processing' || order.order_status === 'shipped' || 
-        order.order_status === 'completed') {
+    if (status === 'active' || status === 'processing' || status === 'shipped' ||
+        status === 'delivered' || status === 'completed') {
+      timeline.push({
+        action: 'Order active',
+        timestamp: new Date(orderDate.getTime() + 60 * 60000),
+        note: 'Payment confirmed, order is active'
+      });
+    }
+
+    if (status === 'processing' || status === 'shipped' || status === 'delivered' ||
+        status === 'completed') {
       timeline.push({
         action: 'Processing started',
-        timestamp: new Date(orderDate.getTime() + 60 * 60000), // 1 hour after
+        timestamp: new Date(orderDate.getTime() + 120 * 60000),
         note: 'Order is being prepared'
       });
     }
 
-    if (order.order_status === 'shipped' || order.order_status === 'completed') {
+    if (status === 'shipped' || status === 'delivered' || status === 'completed') {
       timeline.push({
         action: 'Shipped',
-        timestamp: new Date(orderDate.getTime() + 24 * 60 * 60000), // 1 day after
+        timestamp: new Date(orderDate.getTime() + 24 * 60 * 60000),
         note: order.tracking_number ? `Tracking: ${order.tracking_number}` : 'Package dispatched'
       });
     }
 
-    if (order.order_status === 'completed') {
+    if (status === 'delivered' || status === 'completed') {
       timeline.push({
         action: 'Delivered',
-        timestamp: new Date(orderDate.getTime() + 3 * 24 * 60 * 60000), // 3 days after
+        timestamp: new Date(orderDate.getTime() + 3 * 24 * 60 * 60000),
         note: 'Order delivered successfully'
       });
     }
 
-    if (order.order_status === 'cancelled') {
+    if (status === 'cancelled') {
       timeline.push({
         action: 'Order cancelled',
         timestamp: new Date(),
@@ -396,15 +420,18 @@ const OrderManagementSystem = () => {
 
   const mapStatusToDb = (componentStatus) => {
     const statusMap = {
-      'pending': 'pending',
-      'confirmed': 'confirmed',
+      'order_placed': 'order_placed',
+      'pending_payment': 'pending_payment',
+      'active': 'active',
       'processing': 'processing',
       'shipped': 'shipped',
-      'delivered': 'completed',
+      'delivered': 'delivered',
       'cancelled': 'cancelled',
+      'pending': 'pending',
+      'confirmed': 'confirmed',
       'refunded': 'refunded'
     };
-    return statusMap[componentStatus] || 'pending';
+    return statusMap[componentStatus] || 'order_placed';
   };
 
   const handleBulkStatusUpdate = async (orderIds, newStatus) => {
