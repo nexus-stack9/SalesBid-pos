@@ -2,12 +2,16 @@ import React from 'react';
 
 const OrderStatusBadge = ({ status }) => {
   const statusConfig = {
-    pending: {
-      label: 'Pending',
+    order_placed: {
+      label: 'Order Placed',
+      className: 'bg-blue-100 text-blue-800 border-blue-200'
+    },
+    pending_payment: {
+      label: 'Pending Payment',
       className: 'bg-warning/10 text-warning border-warning/20'
     },
-    confirmed: {
-      label: 'Confirmed',
+    active: {
+      label: 'Active',
       className: 'bg-accent/10 text-accent border-accent/20'
     },
     processing: {
@@ -25,6 +29,14 @@ const OrderStatusBadge = ({ status }) => {
     cancelled: {
       label: 'Cancelled',
       className: 'bg-error/10 text-error border-error/20'
+    },
+    pending: {
+      label: 'Pending',
+      className: 'bg-warning/10 text-warning border-warning/20'
+    },
+    confirmed: {
+      label: 'Confirmed',
+      className: 'bg-accent/10 text-accent border-accent/20'
     },
     refunded: {
       label: 'Refunded',

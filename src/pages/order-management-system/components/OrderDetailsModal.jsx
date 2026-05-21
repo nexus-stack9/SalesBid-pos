@@ -1,12 +1,25 @@
-// components/OrderDetailsModal.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import Button from '../../../components/ui/Button';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import OrderStatusBadge from './OrderStatusBadge';
 import OrderProgressTracker from './OrderProgressTracker';
+import Select from '../../../components/ui/Select';
+
+const statusOptions = [
+  { value: 'order_placed', label: 'Order Placed' },
+  { value: 'pending_payment', label: 'Pending Payment' },
+  { value: 'active', label: 'Active' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' }
+];
 
 const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [updating, setUpdating] = useState(false);
+
   if (!isOpen || !order) return null;
 
   const formatDate = (date) => {
@@ -27,14 +40,28 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
     })?.format(amount);
   };
 
+  const handleStatusChange = async () => {
+    if (!selectedStatus || selectedStatus === order?.status) return;
+    setUpdating(true);
+    try {
+      await onStatusUpdate(order?.id, selectedStatus);
+      setSelectedStatus('');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Order Details</h2>
-            <p className="text-sm text-muted-foreground">Order #{order?.id}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Order Details</h2>
+              <p className="text-sm text-muted-foreground">Order #{order?.id}</p>
+            </div>
+            <OrderStatusBadge status={order?.status} />
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <Icon name="X" size={20} />
@@ -44,19 +71,43 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Order Information */}
+            {/* Left Column */}
             <div className="space-y-6">
               {/* Status and Progress */}
               <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-foreground">Order Status</h3>
-                  <OrderStatusBadge status={order?.status} />
-                </div>
+                <h3 className="font-medium text-foreground mb-4">Order Progress</h3>
                 <OrderProgressTracker 
                   currentStatus={order?.status}
                   orderId={order?.id}
                   onStatusUpdate={onStatusUpdate}
                 />
+              </div>
+
+              {/* Order Identifiers */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h3 className="font-medium text-foreground mb-3">Order Identifiers</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order ID:</span>
+                    <span className="text-foreground font-mono">#{order?.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Product ID:</span>
+                    <span className="text-foreground">{order?.productId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Buyer ID:</span>
+                    <span className="text-foreground">{order?.buyerId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Seller ID:</span>
+                    <span className="text-foreground">{order?.sellerId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Winning Bid ID:</span>
+                    <span className="text-foreground">{order?.winningBidId || 'N/A'}</span>
+                  </div>
+                </div>
               </div>
 
               {/* Customer Information */}
@@ -108,8 +159,30 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
               </div>
             </div>
 
-            {/* Order Items and Summary */}
+            {/* Right Column */}
             <div className="space-y-6">
+              {/* Change Status */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <h3 className="font-medium text-foreground mb-3">Change Status</h3>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Select
+                      options={statusOptions}
+                      value={selectedStatus}
+                      onChange={setSelectedStatus}
+                      placeholder="Select new status..."
+                    />
+                  </div>
+                  <Button
+                    variant="default"
+                    onClick={handleStatusChange}
+                    disabled={!selectedStatus || selectedStatus === order?.status || updating}
+                  >
+                    {updating ? 'Updating...' : 'Update'}
+                  </Button>
+                </div>
+              </div>
+
               {/* Order Items */}
               <div>
                 <h3 className="font-medium text-foreground mb-3">Order Items</h3>
@@ -223,13 +296,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose, onStatusUpdate }) => {
         <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
           <Button variant="outline" onClick={onClose}>
             Close
-          </Button>
-          <Button 
-            variant="default"
-            iconName="Download"
-            iconPosition="left"
-          >
-            Download Invoice
           </Button>
         </div>
       </div>
